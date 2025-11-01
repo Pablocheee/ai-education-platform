@@ -66,25 +66,38 @@ UBI_SYSTEM = {
     "distributed": 0,
     "transactions": []
 }
-def process_ubi_payment(amount, from_user):
-    """Обрабатывает платеж и распределяет по UBI"""
-    UBI_SYSTEM["total_income"] += amount
+
+def generate_ai_lesson(lesson_topic, user_level=1):
+    """Генерирует персонализированный урок через AI"""
+    prompt = f"""
+    Создай образовательный контент на тему: "{lesson_topic}"
     
-    distribution = {
-        "reinvestment": amount * 0.6,      # 60% на развитие
-        "ubi_fund": amount * 0.3,          # 30% в UBI фонд  
-        "founder": amount * 0.1            # 10% основателю
-    }
+    Требования:
+    - Уровень сложности: {user_level}/5
+    - Формат: практический урок с примерами
+    - Структура: теория + практическое задание
+    - Длина: 500-700 слов
+    - Язык: русский с профессиональной лексикой
     
-    UBI_SYSTEM["distributed"] += distribution["ubi_fund"]
-    UBI_SYSTEM["transactions"].append({
-        "amount": amount,
-        "from": from_user,
-        "distribution": distribution,
-        "timestamp": "2025-01-11"  # позже заменим на реальное время
-    })
+    Содержание:
+    1. Ключевая концепция (простыми словами)
+    2. Практические примеры из реальной жизни  
+    3. Пошаговое руководство по применению
+    4. Задание для закрепления
+    5. Советы для дальнейшего развития
+    """
     
-    return distribution
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "Ты эксперт-преподаватель с 20-летним опытом. Создавай практические, полезные уроки которые сразу можно применять в работе."},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=1500,
+        temperature=0.7
+    )
+    
+    return response.choices[0].message.content
 
 def update_user_progress(chat_id, lesson_name):
     """Обновляет прогресс пользователя"""
@@ -119,6 +132,46 @@ def process_ubi_payment(amount, from_user):
     })
     
     return distribution
+
+def generate_ai_lesson(lesson_topic, user_level=1):
+    """Генерирует персонализированный урок через AI"""
+    prompt = f"""
+    Создай образовательный контент на тему: "{lesson_topic}"
+    
+    Требования:
+    - Уровень сложности: {user_level}/5
+    - Формат: практический урок с примерами
+    - Структура: теория + практическое задание
+    - Длина: 500-700 слов
+    - Язык: русский с профессиональной лексикой
+    
+    Содержание:
+    1. Ключевая концепция (простыми словами)
+    2. Практические примеры из реальной жизни  
+    3. Пошаговое руководство по применению
+    4. Задание для закрепления
+    5. Советы для дальнейшего развития
+    """
+    
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "Ты эксперт-преподаватель с 20-летним опытом. Создавай практические, полезные уроки которые сразу можно применять в работе."},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=1500,
+        temperature=0.7
+    )
+    
+    return response.choices[0].message.content
+
+# Создаем инлайн-кнопки для каждого урока
+inline_keyboard = {
+    "inline_keyboard": [
+        [{"text": f"📖 Открыть урок: {lesson}", "callback_data": f"open_lesson_{hash(lesson)}"}]
+        for lesson in course_info['уроки']
+    ]
+}
             
 def generate_ton_payment_link(chat_id, amount=10):
     """Генерирует платежную ссылку для Tonkeeper"""
@@ -178,9 +231,9 @@ def telegram_webhook():
                 # Создаем инлайн-кнопки для каждого урока
                 inline_keyboard = {
                     "inline_keyboard": [
-                        [{"text": f"✅ Отметить пройденным: {lesson}", "callback_data": f"complete_{hash(lesson)}"}] 
+                        [{"text": f"📖 Открыть урок: {lesson}", "callback_data": f"open_lesson_{hash(lesson)}"}]
                         for lesson in course_info['уроки']
-                    ] + [[{"text": "📊 Мой прогресс", "callback_data": "show_progress"}]]
+                    ]
                 }
                 
                 requests.post(
@@ -295,6 +348,52 @@ def telegram_webhook():
             
             elif callback_text == "show_progress":
                 progress = USER_PROGRESS.get(chat_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
+                
+                response_text = f"""📊 *ВАШ ПРОГРЕСС*
+
+🎯 Уровень: {progress['уровень']}
+⭐ Баллы: {progress['баллы']}
+📚 Пройдено уроков: {len(progress['пройденные_уроки'])}
+
+*Следующий уровень через:* {4 - len(progress['пройденные_уроки']) % 4} уроков
+
+💫 *Продолжайте эволюцию!*"""
+
+                requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": response_text,
+                        "parse_mode": "Markdown"
+                    }
+                )
+
+            elif callback_text.startswith('open_lesson_'):
+                lesson_hash = callback_text.replace('open_lesson_', '')
+                
+                for course_name, course_info in COURSES.items():
+                    for lesson in course_info['уроки']:
+                        if hash(lesson) == int(lesson_hash):
+                            # Генерируем AI-урок
+                            ai_lesson = generate_ai_lesson(lesson, USER_PROGRESS.get(chat_id, {}).get('уровень', 1))
+                            
+                            # Отправляем урок с кнопкой "✅ Завершить урок"
+                            inline_keyboard = {
+                                "inline_keyboard": [[
+                                    {"text": "✅ Завершить урок", "callback_data": f"complete_{lesson_hash}"}
+                                ]]
+                            }
+                            
+                            requests.post(
+                                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                                json={
+                                    "chat_id": chat_id,
+                                    "text": f"📚 *{lesson}*\n\n{ai_lesson}",
+                                    "parse_mode": "Markdown",
+                                    "reply_markup": inline_keyboard
+                                }
+                            )
+                            break
                 
                 response_text = f"""📊 *ВАШ ПРОГРЕСС*
 
