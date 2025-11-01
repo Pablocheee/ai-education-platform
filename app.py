@@ -33,63 +33,6 @@ def telegram_webhook():
         chat_id = message.get('chat', {}).get('id')
         text = message.get('text', '')
         
-@app.route('/webhook', methods=['POST'])
-def telegram_webhook():
-    """Webhook для Telegram бота"""
-    try:
-        data = request.json
-        message = data.get('message', {})
-        chat_id = message.get('chat', {}).get('id')
-        text = message.get('text', '')
-        
-        # ОБРАБОТКА СПЕЦИАЛЬНЫХ КОМАНД - ДОБАВЬ ЭТОТ БЛОК ПЕРВЫМ
-        if text.startswith('/'):
-            if text == '/math':
-                response_text = "🧮 Начнем урок математики!\n\nРеши: 15 + 25 = ?\n\nА теперь посложнее: сколько будет 7 × 8?"
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": response_text})
-                return jsonify({"status": "ok"})
-                
-            elif text == '/english':
-                response_text = "🌍 English Lesson!\n\nBasic phrases:\n• Hello - Привет\n• How are you? - Как дела?\n• I'm learning - Я учусь\n\nPractice: Translate 'Good morning'"
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": response_text})
-                return jsonify({"status": "ok"})
-                
-            elif text == '/science':
-                response_text = "🔬 Научный факт дня!\n\nЗнаешь ли ты, что:\n• Свет от Солнца до Земли идет 8 минут\n• У пчел 5 глаз\n• Венера вращается в обратную сторону\n\nХочешь узнать больше о космосе?"
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": response_text})
-                return jsonify({"status": "ok"})
-                
-            elif text == '/programming':
-                response_text = "💻 Основы Python:\n\nprint('Hello World!')\n\nЭто твоя первая программа! 🎉\n\nХочешь научиться создавать переменные?"
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": response_text})
-                return jsonify({"status": "ok"})
-            
-            elif text == '/start':
-                response_text = "🤖 Добро пожаловать в AI-Школу!\n\nДоступные команды:\n/math - Математика\n/english - Английский\n/science - Наука\n/programming - Программирование\n/subscribe - Премиум подписка\n\nПросто напиши вопрос - и я объясню!"
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": response_text})
-                return jsonify({"status": "ok"})            
-                
-            elif text == '/subscribe':
-                response_text = f"""💎 ПРЕМИУМ ПОДПИСКА
-
-Переведите 10 TON на кошелек:
-`{TON_WALLET}`
-
-После оплаты отправьте хэш транзакции для активации премиум-доступа."""
-                
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", 
-                            json={"chat_id": chat_id, "text": response_text})
-                return jsonify({"status": "ok"})
-
-        # 🔥 ОБРАБОТЧИК ХЭША ДОЛЖЕН БЫТЬ ЗДЕСЬ - ПОСЛЕ ЗАКРЫТИЯ БЛОКА КОМАНД
-        elif len(text) == 64 and all(c in '0123456789abcdefABCDEF' for c in text):
-            # Это похоже на хэш транзакции
-            response_text = f"✅ Проверяю транзакцию {text[:16]}...\nПремиум доступ будет активирован в течение 5 минут."
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", 
-                         json={"chat_id": chat_id, "text": response_text})
-            return jsonify({"status": "ok"})
-        
-        # СУЩЕСТВУЮЩИЙ КОД ДЛЯ ОБЫЧНЫХ СООБЩЕНИЙ
         if text:
             # AI ответ через OpenAI (новая версия API)
             response = client.chat.completions.create(
