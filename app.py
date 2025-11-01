@@ -152,6 +152,17 @@ def telegram_webhook():
         logging.error(f"Webhook error: {e}")
         return jsonify({"status": "error", "message": str(e)})
 
+TON_API_KEY = "AEZIWI7NPO6LFRIAAAAFCRWL76ZY7YKGQS2HFKW66VUFXS4NR2M54PJL2NJBUYWDWFX4BEQ"
+
+@app.route('/ton-payment-webhook', methods=['POST'])
+def ton_payment_webhook():
+    """Вебхук для подтверждения платежей TON"""
+    try:
+        data = request.json
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error"})
+    
 @app.route('/test-ai', methods=['POST'])
 def test_ai():
     """Тестовый endpoint для AI"""
