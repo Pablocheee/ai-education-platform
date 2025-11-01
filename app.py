@@ -249,7 +249,9 @@ def telegram_webhook():
                     "reply_markup": menu['keyboard']
                 }
             )
-            return jsonify({"status": "ok"})       
+        
+        # ✅ ВАЖНО: Всегда возвращаем response
+        return jsonify({"status": "ok"})       
         
     except Exception as e:
         logging.error(f"Webhook error: {e}")
