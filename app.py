@@ -165,16 +165,15 @@ def ton_payment_webhook():
 
 @app.route('/setup-ton-webhook', methods=['GET'])
 def setup_ton_webhook():
-    """Настройка вебхука в TON Console"""
+    """Настройка вебхука в TON API"""
     try:
         webhook_url = f"https://{request.host}/ton-payment-webhook"
         
         response = requests.post(
-            "https://tonconsole.com/api/v1/webhooks",
+            "https://rt.tonapi.io/webhooks",
             headers={"Authorization": f"Bearer {TON_API_KEY}"},
             json={
-                "url": webhook_url,
-                "events": ["payment.received", "transaction.confirmed"]
+                "endpoint": webhook_url
             }
         )
         
