@@ -354,49 +354,6 @@ def telegram_webhook():
         logging.error(f"Webhook error: {e}")
         return jsonify({"status": "error", "message": str(e)})
 
-@app.route('/callback', methods=['POST'])
-def callback_handler():
-    """Обработчик inline-кнопок"""
-    try:
-        data = request.json
-        callback_query = data.get('callback_query', {})
-        chat_id = callback_query.get('message', {}).get('chat', {}).get('id')
-        callback_data = callback_query.get('data', '')
-        
-        # Обработка меню
-        if callback_data.startswith('menu:'):
-            menu_name = callback_data.split(':')[1]
-            menu = AI_MENUS.get(menu_name, AI_MENUS['main'])
-            
-            requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText",
-                json={
-                    "chat_id": chat_id,
-                    "message_id": callback_query['message']['message_id'],
-                    "text": menu['text'],
-                    "reply_markup": menu['keyboard'],
-                    "parse_mode": "Markdown"
-                }
-            )
-        
-                # Обработка платежей
-        elif callback_data == "payment:premium":
-            payment_link = generate_ton_payment_link(chat_id)
-            
-            requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                json={
-                    "chat_id": chat_id,
-                    "text": f"💳 *ОПЛАТА ПРЕМИУМ ДОСТУПА*\n\nСтоимость: 10 TON/месяц\n\n[Оплатить]({payment_link})",
-                    "parse_mode": "Markdown"
-                }
-            )
-        
-        return jsonify({"status": "ok"})
-        
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
-
 TON_API_KEY = "AEZIWI7NPO6LFRIAAAAFCRWL76ZY7YKGQS2HFKW66VUFXS4NR2M54PJL2NJBUYWDWFX4BEQ"
 
 @app.route('/ton-payment-webhook', methods=['POST'])
