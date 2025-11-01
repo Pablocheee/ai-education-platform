@@ -57,21 +57,63 @@ def telegram_webhook():
         elif text in ["🎓 Бесплатные уроки", "💰 Премиум подписка", "👤 Мой профиль", "ℹ️ О проекте"]:
             if text == "🎓 Бесплатные уроки":
                 response_text = "🎓 Бесплатные уроки:\n\n• Математика: основы\n• Английский: начальный уровень\n• Программирование: Python базовый\n\nНапишите тему, которую хотите изучить!"
+                
+                requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": response_text,
+                        "parse_mode": "HTML"
+                    }
+                )
+                
             elif text == "💰 Премиум подписка":
-                response_text = "💰 Премиум подписка:\n\n• Полный доступ ко всем курсам\n• Персональный AI-учитель 24/7\n• Прогресс обучения и сертификаты\n\nСтоимость: $10/месяц\n\n⚡ Скоро будет доступна оплата в TON!"
+                # Создаем инлайн-кнопку для оплаты
+                inline_keyboard = {
+                    "inline_keyboard": [[
+                        {
+                            "text": "💳 Оплатить 10 TON", 
+                            "url": f"https://t.me/wallet?startattach=wpay_order-orderId&amount=10000000000"
+                        }
+                    ]]
+                }
+                
+                response_text = "💰 Премиум подписка\n\n✅ Полный доступ ко всем курсам\n🎓 Персональный AI-учитель 24/7\n📊 Прогресс обучения и сертификаты\n\nСтоимость: 10 TON/месяц"
+                
+                requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": response_text,
+                        "reply_markup": inline_keyboard,
+                        "parse_mode": "HTML"
+                    }
+                )
+                
             elif text == "👤 Мой профиль":
                 response_text = f"👤 Ваш профиль:\n\nID: {chat_id}\nСтатус: Бесплатный аккаунт\nПрогресс: 0 уроков пройдено\n\nПерейдите на премиум для полного доступа!"
+                
+                requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": response_text,
+                        "parse_mode": "HTML"
+                    }
+                )
+                
             else:  # ℹ️ О проекте
                 response_text = "ℹ️ Future_UBI - автономная AI-компания\n\nМиссия: Люди творят, AI работает, UBI распределяет\n\n60% - развитие платформы\n30% - универсальный базовый доход\n10% - основателю"
-
-            requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                json={
-                    "chat_id": chat_id,
-                    "text": response_text,
-                    "parse_mode": "HTML"
-                }
-            )
+                
+                requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": response_text,
+                        "parse_mode": "HTML"
+                    }
+                )
+            
             return jsonify({"status": "ok"})
 
         # Обычные сообщения - обрабатываем AI
