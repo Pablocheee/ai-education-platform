@@ -73,11 +73,11 @@ AI_MENUS = {
         'text': "🌌 *ПРИВЕТСТВУЮ, ИСКАТЕЛЬ*\n\nЯ — AI-компаньон Future_UBI...",
         'keyboard': {
             "inline_keyboard": [
-                [{"text": "🚀 Войти в AI-мир", "callback_data": "menu:education"}],  # ← ИСПРАВЛЕНО
+                [{"text": "🚀 Войти в AI-мир", "callback_data": "menu:education"}],
                 [{"text": "🎓 Начать обучение", "callback_data": "menu:education"}],
-                [{"text": "💫 Моя эволюция", "callback_data": "menu:education"}],    # ← ИСПРАВЛЕНО
-                [{"text": "⚡ Ускорить карьеру", "callback_data": "menu:education"}], # ← ИСПРАВЛЕНО
-                [{"text": "👤 Мой профиль", "callback_data": "profile:show"}]        # ← ДОБАВЛЕНО
+                [{"text": "💫 Моя эволюция", "callback_data": "menu:education"}],
+                [{"text": "⚡ Ускорить карьеру", "callback_data": "menu:education"}],
+                [{"text": "👤 Мой профиль", "callback_data": "profile:show"}]
             ]
         }
     },
