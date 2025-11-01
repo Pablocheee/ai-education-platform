@@ -58,6 +58,21 @@ COURSES = {
     }
 }
 
+USER_PROGRESS = {}  # {chat_id: {"пройденные_уроки": [], "уровень": 1, "баллы": 0}}
+
+def update_user_progress(chat_id, lesson_name):
+    """Обновляет прогресс пользователя"""
+    if chat_id not in USER_PROGRESS:
+        USER_PROGRESS[chat_id] = {"пройденные_уроки": [], "уровень": 1, "баллы": 0}
+    
+    if lesson_name not in USER_PROGRESS[chat_id]["пройденные_уроки"]:
+        USER_PROGRESS[chat_id]["пройденные_уроки"].append(lesson_name)
+        USER_PROGRESS[chat_id]["баллы"] += 10
+        
+        # Повышение уровня
+        if len(USER_PROGRESS[chat_id]["пройденные_уроки"]) % 4 == 0:
+            USER_PROGRESS[chat_id]["уровень"] += 1
+            
 def generate_ton_payment_link(chat_id, amount=10):
     """Генерирует платежную ссылку для Tonkeeper"""
     return f"https://app.tonkeeper.com/transfer/UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY?amount={amount*1000000000}&text=premium_{chat_id}"
@@ -195,14 +210,24 @@ def telegram_webhook():
                 )
                     
             elif text == "👤 Мой профиль":
-                response_text = f"👤 Ваш профиль:\n\nID: {chat_id}\nСтатус: Бесплатный аккаунт\nПрогресс: 0 уроков пройдено\n\nПерейдите на премиум для полного доступа!"
+                progress = USER_PROGRESS.get(chat_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
                 
+                response_text = f"""👤 *ВАШ ПРОФИЛЬ В СИСТЕМЕ*
+
+📊 Уровень: {progress['уровень']}
+🎯 Баллы: {progress['баллы']}
+📚 Пройдено уроков: {len(progress['пройденные_уроки'])}
+
+*Следующий уровень через:* {4 - len(progress['пройденные_уроки']) % 4} уроков
+
+💫 *Эволюция продолжается...*"""
+
                 requests.post(
                     f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
                     json={
                         "chat_id": chat_id,
                         "text": response_text,
-                        "parse_mode": "HTML"
+                        "parse_mode": "Markdown"
                     }
                 )
                 
@@ -242,8 +267,59 @@ def telegram_webhook():
                     "parse_mode": "HTML"
                 }
             )
-        
-        return jsonify({"status": "ok"})
+
+        elif 'callback_query' in data:
+            callback_data = data['callback_query']
+            chat_id = callback_data['message']['chat']['id']
+            callback_text = callback_data['data']
+            
+            if callback_text.startswith('complete_'):
+                # Пользователь отметил урок пройденным
+                lesson_hash = callback_text.replace('complete_', '')
+                
+                # Находим название урока по хешу
+                for course_name, course_info in COURSES.items():
+                    for lesson in course_info['уроки']:
+                        if hash(lesson) == int(lesson_hash):
+                            update_user_progress(chat_id, lesson)
+                            
+                            response_text = f"✅ *Урок отмечен пройденным!*\n\n🎯 Получено: 10 баллов\n📚 Урок: {lesson}\n\n💫 Ваш прогресс растет!"
+                            
+                            requests.post(
+                                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                                json={
+                                    "chat_id": chat_id,
+                                    "text": response_text,
+                                    "parse_mode": "Markdown"
+                                }
+                            )
+                            break
+            
+            elif callback_text == "show_progress":
+                progress = USER_PROGRESS.get(chat_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
+                
+                response_text = f"""📊 *ВАШ ПРОГРЕСС*
+
+🎯 Уровень: {progress['уровень']}
+⭐ Баллы: {progress['баллы']}
+📚 Пройдено уроков: {len(progress['пройденные_уроки'])}
+
+*Следующий уровень через:* {4 - len(progress['пройденные_уроки']) % 4} уроков
+
+💫 *Продолжайте эволюцию!*"""
+
+                requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": response_text,
+                        "parse_mode": "Markdown"
+                    }
+                )
+            
+            return jsonify({"status": "ok"})
+
+        return jsonify({"status": "ok"})        
         
     except Exception as e:
         logging.error(f"Webhook error: {e}")
