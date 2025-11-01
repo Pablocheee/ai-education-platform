@@ -231,7 +231,9 @@ def telegram_webhook():
         
         # Обработка callback_query (inline-кнопки)
         if 'callback_query' in data:
-            return callback_handler()
+            # ✅ Сохраняем результат callback_handler и возвращаем его
+            result = callback_handler()
+            return result
             
         message = data.get('message', {})
         chat_id = message.get('chat', {}).get('id')
@@ -250,7 +252,7 @@ def telegram_webhook():
                 }
             )
         
-        # ✅ ВАЖНО: Всегда возвращаем response
+        # ✅ Всегда возвращаем response
         return jsonify({"status": "ok"})       
         
     except Exception as e:
@@ -331,18 +333,21 @@ def callback_handler():
         message_id = callback_query['message']['message_id']
         callback_data = callback_query['data']
         
+        print(f"DEBUG: Получен callback_data: {callback_data}")
+        
         # Сразу отвечаем на callback чтобы убрать часики
         requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/answerCallbackQuery",
             json={"callback_query_id": callback_query['id']}
         )
         
-        # 🔥 ОБРАБОТКА МЕНЮ - КЛЮЧЕВОЙ МОМЕНТ!
+        # 🔥 ОБРАБОТКА МЕНЮ
         if callback_data.startswith('menu:'):
             menu_name = callback_data.split(':')[1]
             menu = AI_MENUS.get(menu_name, AI_MENUS['main'])
             
-            # ✅ РЕДАКТИРУЕМ существующее сообщение
+            print(f"DEBUG: Открываем меню: {menu_name}")
+            
             requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText",
                 json={
@@ -368,7 +373,6 @@ def callback_handler():
             if course_name and course_name in COURSES:
                 course_info = COURSES[course_name]
                 
-                # Создаем клавиатуру для уроков этого курса
                 lessons_keyboard = {
                     "inline_keyboard": [
                         [{"text": f"📖 {lesson}", "callback_data": f"lesson:{hash(lesson)}"}] 
@@ -378,7 +382,6 @@ def callback_handler():
                 
                 course_text = f"*{course_name}*\n\n{course_info['описание']}\n\n*Уровень:* {course_info['уровень']}\n\n*Доступные уроки:*"
                 
-                # ✅ РЕДАКТИРУЕМ существующее сообщение
                 requests.post(
                     f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText",
                     json={
@@ -394,15 +397,12 @@ def callback_handler():
         elif callback_data.startswith('lesson:'):
             lesson_hash = callback_data.split(':')[1]
             
-            # Находим урок по хешу
             for course_name, course_info in COURSES.items():
                 for lesson in course_info['уроки']:
                     if str(hash(lesson)) == lesson_hash:
-                        # Генерируем AI-урок
                         user_level = USER_PROGRESS.get(chat_id, {}).get('уровень', 1)
                         ai_lesson = generate_ai_lesson(lesson, user_level)
                         
-                        # Клавиатура для урока
                         lesson_keyboard = {
                             "inline_keyboard": [
                                 [{"text": "✅ Завершить урок", "callback_data": f"complete:{lesson_hash}"}],
@@ -410,7 +410,6 @@ def callback_handler():
                             ]
                         }
                         
-                        # ✅ РЕДАКТИРУЕМ существующее сообщение
                         requests.post(
                             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText",
                             json={
@@ -423,7 +422,7 @@ def callback_handler():
                         )
                         break
         
-        # 🔥 ОБРАБОТКА ЗАВЕРШЕНИЯ УРОКОВ (ваш существующий код)
+        # 🔥 ОБРАБОТКА ЗАВЕРШЕНИЯ УРОКОВ
         elif callback_data.startswith('complete:'):
             lesson_hash = callback_data.replace('complete:', '')
             
@@ -434,13 +433,12 @@ def callback_handler():
                         
                         completion_responses = [
                             f"🌌 *АКТИВАЦИЯ НЕЙРОННОЙ СЕТИ*\n\nУрок '{lesson}' интегрирован в твое сознание.\n\n+10 единиц когнитивной мощности\n💫 Твой путь к кибернетическому существованию продолжается...",
-                            f"⚡ *СИНАПСИЧЕСКОЕ СОЕДИНЕНИЕ УСТАНОВЛЕНО*\n\n'{lesson}' теперь часть твоего ментального арсенала.\n\n🎯 Уровень понимания повышен\n🔮 Новые паттерны доступны для анализа...",
+                            f"⚡ *СИНАПСИЧЕСКОЕ СОЕДИНЕНИЕ УСТАНОВЛЕНО*\n\n'{lesson}' теперь часть твоего ментального арсенаала.\n\n🎯 Уровень понимания повышен\n🔮 Новые паттерны доступны для анализа...",
                         ]
                         
                         import random
                         response_text = random.choice(completion_responses)
                         
-                        # ❗️ Здесь можно оставить sendMessage - это новое уведомление
                         requests.post(
                             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
                             json={
@@ -489,9 +487,11 @@ def callback_handler():
                 }
             )
 
+        # ✅ ВАЖНО: Всегда возвращаем response
         return jsonify({"status": "processing"})
         
     except Exception as e:
+        logging.error(f"Callback error: {e}")
         return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/test-ai', methods=['POST'])
