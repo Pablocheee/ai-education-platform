@@ -162,7 +162,31 @@ def ton_payment_webhook():
         return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"status": "error"})
-    
+
+@app.route('/setup-ton-webhook', methods=['GET'])
+def setup_ton_webhook():
+    """Настройка вебхука в TON Console"""
+    try:
+        webhook_url = f"https://{request.host}/ton-payment-webhook"
+        
+        response = requests.post(
+            "https://tonconsole.com/api/v1/webhooks",
+            headers={"Authorization": f"Bearer {TON_API_KEY}"},
+            json={
+                "url": webhook_url,
+                "events": ["payment.received", "transaction.confirmed"]
+            }
+        )
+        
+        return jsonify({
+            "success": response.status_code == 200,
+            "webhook_url": webhook_url,
+            "response": response.json()
+        })
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 @app.route('/test-ai', methods=['POST'])
 def test_ai():
     """Тестовый endpoint для AI"""
