@@ -60,6 +60,32 @@ COURSES = {
 
 USER_PROGRESS = {}  # {chat_id: {"пройденные_уроки": [], "уровень": 1, "баллы": 0}}
 
+UBI_SYSTEM = {
+    "total_income": 0,
+    "ubi_fund": 0,
+    "distributed": 0,
+    "transactions": []
+}
+def process_ubi_payment(amount, from_user):
+    """Обрабатывает платеж и распределяет по UBI"""
+    UBI_SYSTEM["total_income"] += amount
+    
+    distribution = {
+        "reinvestment": amount * 0.6,      # 60% на развитие
+        "ubi_fund": amount * 0.3,          # 30% в UBI фонд  
+        "founder": amount * 0.1            # 10% основателю
+    }
+    
+    UBI_SYSTEM["distributed"] += distribution["ubi_fund"]
+    UBI_SYSTEM["transactions"].append({
+        "amount": amount,
+        "from": from_user,
+        "distribution": distribution,
+        "timestamp": "2025-01-11"  # позже заменим на реальное время
+    })
+    
+    return distribution
+
 def update_user_progress(chat_id, lesson_name):
     """Обновляет прогресс пользователя"""
     if chat_id not in USER_PROGRESS:
@@ -72,6 +98,27 @@ def update_user_progress(chat_id, lesson_name):
         # Повышение уровня
         if len(USER_PROGRESS[chat_id]["пройденные_уроки"]) % 4 == 0:
             USER_PROGRESS[chat_id]["уровень"] += 1
+
+def process_ubi_payment(amount, from_user):
+    """Обрабатывает платеж и распределяет по UBI"""
+    UBI_SYSTEM["total_income"] += amount
+    
+    distribution = {
+        "reinvestment": amount * 0.6,      # 60% на развитие
+        "ubi_fund": amount * 0.3,          # 30% в UBI фонд  
+        "founder": amount * 0.1            # 10% основателю
+    }
+    
+    UBI_SYSTEM["ubi_fund"] += distribution["ubi_fund"]  # ← ОБНОВЛЯЕМ ФОНД
+    UBI_SYSTEM["distributed"] += distribution["ubi_fund"]
+    UBI_SYSTEM["transactions"].append({
+        "amount": amount,
+        "from": from_user,
+        "distribution": distribution,
+        "timestamp": "2025-01-11"
+    })
+    
+    return distribution
             
 def generate_ton_payment_link(chat_id, amount=10):
     """Генерирует платежную ссылку для Tonkeeper"""
@@ -106,6 +153,7 @@ def telegram_webhook():
                     ["🚀 Войти в систему AI", "💫 Запустить эволюцию"],
                     ["🌌 База знаний", "⚡ Карьерный ускоритель"],
                     ["💰 Премиум доступ", "👤 Мой профиль"]
+                    ["🌍 UBI Система"] 
                 ],
                 "resize_keyboard": True
             }
@@ -122,7 +170,7 @@ def telegram_webhook():
             return jsonify({"status": "ok"})
 
         # Обработка нажатий кнопок
-        elif text in ["🚀 Войти в систему AI", "💫 Запустить эволюцию", "🌌 База знаний", "⚡ Карьерный ускоритель", "💰 Премиум доступ", "👤 Мой профиль"]:
+        elif text in ["🚀 Войти в систему AI", "💫 Запустить эволюцию", "🌌 База знаний", "⚡ Карьерный ускоритель", "💰 Премиум доступ", "👤 Мой профиль", "🌍 UBI Система"]:
             if text in ["🚀 Войти в систему AI", "💫 Запустить эволюцию", "🌌 База знаний", "⚡ Карьерный ускоритель"]:
                 course_info = COURSES[text]
                 response_text = f"{text}\n\n{course_info['описание']}\n\nУровень: {course_info['уровень']}\n\nМодули:\n" + "\n".join([f"• {lesson}" for lesson in course_info['уроки']])
@@ -171,7 +219,7 @@ def telegram_webhook():
                     }
                 )
                 
-            elif text == "👤 Мой профиль":
+                       elif text == "👤 Мой профиль":
                 progress = USER_PROGRESS.get(chat_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
                 
                 response_text = f"""👤 *ВАШ ПРОФИЛЬ В СИСТЕМЕ*
@@ -180,9 +228,34 @@ def telegram_webhook():
 🎯 Баллы: {progress['баллы']}
 📚 Пройдено уроков: {len(progress['пройденные_уроки'])}
 
-*Следующий уровень через:* {4 - len(progress['пройденные_уроки']) % 4} уроков
+🌍 *UBI СИСТЕМА*
+💫 Собрано в фонд: {UBI_SYSTEM['ubi_fund']} TON
+🚀 Всего доходов: {UBI_SYSTEM['total_income']} TON
 
 💫 *Эволюция продолжается...*"""
+
+                requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": response_text,
+                        "parse_mode": "Markdown"
+                    }
+                )
+
+            elif text == "🌍 UBI Система":
+                response_text = f"""🌍 *СИСТЕМА UBI FUTURE_UBI*
+
+💰 Всего доходов: {UBI_SYSTEM['total_income']} TON
+💫 Накоплено в UBI фонд: {UBI_SYSTEM['ubi_fund']} TON  
+🚀 Распределено: {UBI_SYSTEM['distributed']} TON
+
+📊 Распределение доходов:
+• 60% - развитие платформы
+• 30% - UBI фонд для сообщества  
+• 10% - основателю за создание
+
+💫 *Создаем экономику изобилия вместе*"""
 
                 requests.post(
                     f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
@@ -257,6 +330,14 @@ def ton_payment_webhook():
     """Вебхук для подтверждения платежей TON"""
     try:
         data = request.json
+        # Тестовая реализация - при первом платеже добавляем 10 TON
+        if UBI_SYSTEM["total_income"] == 0:
+            distribution = process_ubi_payment(10, "first_payment")
+            return jsonify({
+                "status": "success", 
+                "distribution": distribution,
+                "message": f"💰 Первый доход! UBI фонд пополнен на {distribution['ubi_fund']} TON"
+            })
         return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"status": "error"})
