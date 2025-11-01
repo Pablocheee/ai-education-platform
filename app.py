@@ -186,6 +186,28 @@ def setup_ton_webhook():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
+@app.route('/subscribe-wallet', methods=['GET'])
+def subscribe_wallet():
+    """Подписка вебхука на кошелек для отслеживания платежей"""
+    try:
+        response = requests.post(
+            "https://rt.tonapi.io/webhooks/15412/account-tx/subscribe",
+            headers={"Authorization": f"Bearer {TON_API_KEY}"},
+            json={
+                "accounts": [{
+                    "account_id": "UQAbs4Ak99raDhS8FUWLWNvKoUQ1LiHIxndfiIAj8p9BiusC"
+                }]
+            }
+        )
+        
+        return jsonify({
+            "success": response.status_code == 200,
+            "response": response.json()
+        })
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 @app.route('/test-ai', methods=['POST'])
 def test_ai():
     """Тестовый endpoint для AI"""
