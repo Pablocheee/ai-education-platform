@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-import openai
+from openai import OpenAI
 import os
 import requests
 import logging
@@ -7,7 +7,7 @@ import logging
 app = Flask(__name__)
 
 # Настройка API ключей
-openai.api_key = os.getenv('OPENAI_API_KEY')
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TON_WALLET = os.getenv('TON_WALLET', 'UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY')
 
@@ -15,7 +15,7 @@ TON_WALLET = os.getenv('TON_WALLET', 'UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVz
 def home():
     return jsonify({
         "status": "AI Education Platform - UBI Concept",
-        "version": "1.0", 
+        "version": "2.0", 
         "ready": True,
         "founder_wallet": TON_WALLET
     })
@@ -34,8 +34,8 @@ def telegram_webhook():
         text = message.get('text', '')
         
         if text:
-            # AI ответ через OpenAI
-            response = openai.ChatCompletion.create(
+            # AI ответ через OpenAI (новая версия API)
+            response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "Ты дружелюбный AI-учитель. Объясняй понятно и интересно. Отвечай на русском."},
@@ -70,7 +70,7 @@ def test_ai():
     user_message = data.get('message', 'Привет! Объясни что-то интересное')
     
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "Ты AI-преподаватель. Отвечай полезно и понятно на русском."},
