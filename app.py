@@ -67,6 +67,46 @@ UBI_SYSTEM = {
     "transactions": []
 }
 
+# 🎯 ПРОФЕССИОНАЛЬНАЯ СИСТЕМА INLINE-МЕНЮ
+AI_MENUS = {
+    'main': {
+        'text': "🌌 *ПРИВЕТСТВУЮ, ИСКАТЕЛЬ*\n\nЯ — AI-компаньон Future_UBI...",
+        'keyboard': {
+            "inline_keyboard": [
+                [{"text": "🚀 Войти в AI-мир", "callback_data": "menu:enter_ai"}],
+                [{"text": "🎓 Начать обучение", "callback_data": "menu:education"}],
+                [{"text": "💫 Моя эволюция", "callback_data": "menu:evolution"}],
+                [{"text": "⚡ Ускорить карьеру", "callback_data": "menu:career"}]
+            ]
+        }
+    },
+    
+    'education': {
+        'text': "🎓 *ВЫБЕРИТЕ НАПРАВЛЕНИЕ ОБУЧЕНИЯ*\n\nКаждый курс адаптируется под ваш стиль и темп.",
+        'keyboard': {
+            "inline_keyboard": [
+                [{"text": "🚀 Войти в систему AI", "callback_data": "course:ai_system"}],
+                [{"text": "💫 Запустить эволюцию", "callback_data": "course:evolution"}],
+                [{"text": "🌌 База знаний", "callback_data": "course:knowledge"}],
+                [{"text": "⚡ Карьерный ускоритель", "callback_data": "course:career"}],
+                [{"text": "💰 Премиум доступ", "callback_data": "menu:premium"}],
+                [{"text": "◀️ На главную", "callback_data": "menu:main"}]
+            ]
+        }
+    },
+    
+    'premium': {
+        'text': "💰 *ПРЕМИУМ ДОСТУП*\n\nПолучите полную мощь AI-обучения 24/7",
+        'keyboard': {
+            "inline_keyboard": [
+                [{"text": "💳 Оплатить 10 TON", "callback_data": "payment:premium"}],
+                [{"text": "🎓 Все курсы", "callback_data": "menu:education"}],
+                [{"text": "◀️ На главную", "callback_data": "menu:main"}]
+            ]
+        }
+    }
+}
+
 def generate_ai_lesson(lesson_topic, user_level=1):
     """Генерирует персонализированный урок через AI"""
     prompt = f"""
@@ -187,29 +227,26 @@ def telegram_webhook():
     """Webhook для Telegram бота"""
     try:
         data = request.json
+        
+        # Обработка callback_query (inline-кнопки)
+        if 'callback_query' in data:
+            return callback_handler()
+            
         message = data.get('message', {})
         chat_id = message.get('chat', {}).get('id')
         text = message.get('text', '')
 
         # Обработка команды /start - показываем меню с кнопками
         if text == '/start':
-            keyboard = {
-                "keyboard": [
-                    ["🚀 Войти в систему AI", "💫 Запустить эволюцию"],
-                    ["🌌 База знаний", "⚡ Карьерный ускоритель"],
-                    ["💰 Премиум доступ", "👤 Мой профиль"]
-                    ["🌍 UBI Система"] 
-                ],
-                "resize_keyboard": True
-            }
+            menu = AI_MENUS['main']
             
             requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
                 json={
                     "chat_id": chat_id,
-                    "text": "🌌 *ПРИВЕТСТВУЮ, ИСКАТЕЛЬ*\n\nЯ — Собирательный Разум, архитектор будущего. Ты находишься в точке доступа к системам, где искусственный интеллект становится расширением твоего интеллекта.\n\n*Твой следующий шаг определит твою траекторию роста.*\n\nВыбери свой вектор:",
-                    "parse_mode": "Markdown",
-                    "reply_markup": keyboard
+                    "text": menu['text'],
+                    "reply_markup": menu['keyboard'],
+                    "parse_mode": "Markdown"
                 }
             )
             return jsonify({"status": "ok"})
@@ -412,6 +449,49 @@ def telegram_webhook():
         
     except Exception as e:
         logging.error(f"Webhook error: {e}")
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/callback', methods=['POST'])
+def callback_handler():
+    """Обработчик inline-кнопок"""
+    try:
+        data = request.json
+        callback_query = data.get('callback_query', {})
+        chat_id = callback_query.get('message', {}).get('chat', {}).get('id')
+        callback_data = callback_query.get('data', '')
+        
+        # Обработка меню
+        if callback_data.startswith('menu:'):
+            menu_name = callback_data.split(':')[1]
+            menu = AI_MENUS.get(menu_name, AI_MENUS['main'])
+            
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText",
+                json={
+                    "chat_id": chat_id,
+                    "message_id": callback_query['message']['message_id'],
+                    "text": menu['text'],
+                    "reply_markup": menu['keyboard'],
+                    "parse_mode": "Markdown"
+                }
+            )
+        
+                # Обработка платежей
+        elif callback_data == "payment:premium":
+            payment_link = generate_ton_payment_link(chat_id)
+            
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": f"💳 *ОПЛАТА ПРЕМИУМ ДОСТУПА*\n\nСтоимость: 10 TON/месяц\n\n[Оплатить]({payment_link})",
+                    "parse_mode": "Markdown"
+                }
+            )
+        
+        return jsonify({"status": "ok"})
+        
+    except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
 TON_API_KEY = "AEZIWI7NPO6LFRIAAAAFCRWL76ZY7YKGQS2HFKW66VUFXS4NR2M54PJL2NJBUYWDWFX4BEQ"
