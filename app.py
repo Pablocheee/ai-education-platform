@@ -487,7 +487,10 @@ def callback_handler():
             )
 
         return jsonify({"status": "processing"})
-    
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
 @app.route('/test-ai', methods=['POST'])
 def test_ai():
     """Тестовый endpoint для AI"""
