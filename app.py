@@ -164,14 +164,6 @@ def generate_ai_lesson(lesson_topic, user_level=1):
     )
     
     return response.choices[0].message.content
-
-# Создаем инлайн-кнопки для каждого урока
-inline_keyboard = {
-    "inline_keyboard": [
-        [{"text": f"📖 Открыть урок: {lesson}", "callback_data": f"open_lesson_{hash(lesson)}"}]
-        for lesson in course_info['уроки']
-    ]
-}
             
 def generate_ton_payment_link(chat_id, amount=10):
     """Генерирует платежную ссылку для Tonkeeper"""
