@@ -434,13 +434,99 @@ def callback_handler():
             json={"callback_query_id": callback_query['id']}
         )
         
-        # Обработка завершения урока
-        if callback_data.startswith('complete_'):
-            lesson_hash = callback_data.replace('complete_', '')
+        # 🔥 ОБРАБОТКА МЕНЮ - КЛЮЧЕВОЙ МОМЕНТ!
+        if callback_data.startswith('menu:'):
+            menu_name = callback_data.split(':')[1]
+            menu = AI_MENUS.get(menu_name, AI_MENUS['main'])
+            
+            # ✅ РЕДАКТИРУЕМ существующее сообщение
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText",
+                json={
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": menu['text'],
+                    "reply_markup": menu['keyboard'],
+                    "parse_mode": "Markdown"
+                }
+            )
+        
+        # 🔥 ОБРАБОТКА КУРСОВ
+        elif callback_data.startswith('course:'):
+            course_id = callback_data.split(':')[1]
+            course_map = {
+                'ai_system': "🚀 Войти в систему AI",
+                'evolution': "💫 Запустить эволюцию", 
+                'knowledge': "🌌 База знаний",
+                'career': "⚡ Карьерный ускоритель"
+            }
+            
+            course_name = course_map.get(course_id)
+            if course_name and course_name in COURSES:
+                course_info = COURSES[course_name]
+                
+                # Создаем клавиатуру для уроков этого курса
+                lessons_keyboard = {
+                    "inline_keyboard": [
+                        [{"text": f"📖 {lesson}", "callback_data": f"lesson:{hash(lesson)}"}] 
+                        for lesson in course_info['уроки']
+                    ] + [[{"text": "◀️ Назад к курсам", "callback_data": "menu:education"}]]
+                }
+                
+                course_text = f"*{course_name}*\n\n{course_info['описание']}\n\n*Уровень:* {course_info['уровень']}\n\n*Доступные уроки:*"
+                
+                # ✅ РЕДАКТИРУЕМ существующее сообщение
+                requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText",
+                    json={
+                        "chat_id": chat_id,
+                        "message_id": message_id,
+                        "text": course_text,
+                        "reply_markup": lessons_keyboard,
+                        "parse_mode": "Markdown"
+                    }
+                )
+        
+        # 🔥 ОБРАБОТКА УРОКОВ
+        elif callback_data.startswith('lesson:'):
+            lesson_hash = callback_data.split(':')[1]
+            
+            # Находим урок по хешу
+            for course_name, course_info in COURSES.items():
+                for lesson in course_info['уроки']:
+                    if str(hash(lesson)) == lesson_hash:
+                        # Генерируем AI-урок
+                        user_level = USER_PROGRESS.get(chat_id, {}).get('уровень', 1)
+                        ai_lesson = generate_ai_lesson(lesson, user_level)
+                        
+                        # Клавиатура для урока
+                        lesson_keyboard = {
+                            "inline_keyboard": [
+                                [{"text": "✅ Завершить урок", "callback_data": f"complete:{lesson_hash}"}],
+                                [{"text": "◀️ Назад к курсу", "callback_data": f"course:{course_name}"}]
+                            ]
+                        }
+                        
+                        # ✅ РЕДАКТИРУЕМ существующее сообщение
+                        requests.post(
+                            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText",
+                            json={
+                                "chat_id": chat_id, 
+                                "message_id": message_id,
+                                "text": f"📚 *{lesson}*\n\n{ai_lesson}",
+                                "reply_markup": lesson_keyboard,
+                                "parse_mode": "Markdown"
+                            }
+                        )
+                        break
+        
+        # 🔥 ОБРАБОТКА ЗАВЕРШЕНИЯ УРОКОВ (ваш существующий код)
+        elif callback_data.startswith('complete:'):
+            lesson_hash = callback_data.replace('complete:', '')
             
             for course_name, course_info in COURSES.items():
                 for lesson in course_info['уроки']:
-                    if hash(lesson) == int(lesson_hash):
+                    if str(hash(lesson)) == lesson_hash:
                         update_user_progress(chat_id, lesson)
                         
                         completion_responses = [
@@ -451,7 +537,7 @@ def callback_handler():
                         import random
                         response_text = random.choice(completion_responses)
                         
-                        # Отправляем новое сообщение (не редактируем)
+                        # ❗️ Здесь можно оставить sendMessage - это новое уведомление
                         requests.post(
                             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
                             json={
@@ -462,10 +548,25 @@ def callback_handler():
                         )
                         break
         
+        # 🔥 ОБРАБОТКА ПЛАТЕЖЕЙ
+        elif callback_data == "payment:premium":
+            payment_link = generate_ton_payment_link(chat_id)
+            
+            # ❗️ Здесь можно оставить sendMessage - это новое сообщение об оплате
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": f"💳 *ОПЛАТА ПРЕМИУМ ДОСТУПА*\n\nСтоимость: 10 TON/месяц\n\n[Оплатить]({payment_link})",
+                    "parse_mode": "Markdown"
+                }
+            )
+        
         return jsonify({"status": "processing"})
         
     except Exception as e:
-        return jsonify({"status": "error"})
+        logging.error(f"Callback error: {e}")
+        return jsonify({"status": "error", "message": str(e)})
     
 @app.route('/test-ai', methods=['POST'])
 def test_ai():
