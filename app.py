@@ -236,7 +236,6 @@ def telegram_webhook():
         chat_id = message.get('chat', {}).get('id')
         text = message.get('text', '')
 
-        # Обработка команды /start - показываем меню с кнопками
         if text == '/start':
             menu = AI_MENUS['main']
             
@@ -245,13 +244,11 @@ def telegram_webhook():
                 json={
                     "chat_id": chat_id,
                     "text": menu['text'],
-                    "reply_markup": menu['keyboard'],
-                    "parse_mode": "Markdown"
+                    "parse_mode": "Markdown",
+                    "reply_markup": menu['keyboard']
                 }
             )
-            return jsonify({"status": "ok"})
-
-        return jsonify({"status": "ok"})        
+            return jsonify({"status": "ok"})       
         
     except Exception as e:
         logging.error(f"Webhook error: {e}")
@@ -455,7 +452,6 @@ def callback_handler():
         elif callback_data == "payment:premium":
             payment_link = generate_ton_payment_link(chat_id)
             
-            # ❗️ Здесь можно оставить sendMessage - это новое сообщение об оплате
             requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
                 json={
@@ -464,12 +460,33 @@ def callback_handler():
                     "parse_mode": "Markdown"
                 }
             )
-        
+
+        # 🔥 ОБРАБОТКА ПРОФИЛЯ
+        elif callback_data == "profile:show":
+            progress = USER_PROGRESS.get(chat_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
+            
+            response_text = f"""👤 *ВАШ ПРОФИЛЬ В СИСТЕМЕ*
+
+📊 Уровень: {progress['уровень']}
+🎯 Баллы: {progress['баллы']}
+📚 Пройдено уроков: {len(progress['пройденные_уроки'])}
+
+🌍 *UBI СИСТЕМА*
+💫 Собрано в фонд: {UBI_SYSTEM['ubi_fund']} TON
+🚀 Всего доходов: {UBI_SYSTEM['total_income']} TON"""
+
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText",
+                json={
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": response_text,
+                    "parse_mode": "Markdown",
+                    "reply_markup": {"inline_keyboard": [[{"text": "◀️ Назад", "callback_data": "menu:main"}]]}
+                }
+            )
+
         return jsonify({"status": "processing"})
-        
-    except Exception as e:
-        logging.error(f"Callback error: {e}")
-        return jsonify({"status": "error", "message": str(e)})
     
 @app.route('/test-ai', methods=['POST'])
 def test_ai():
