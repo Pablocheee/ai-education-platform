@@ -9,11 +9,11 @@ app = Flask(__name__)
 # Настройка API ключей
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-TON_WALLET = os.getenv('TON_WALLET', 'UQAbs4Ak99raDhS8FUWLWNvKoUQ1LiHIxndfiIAj8p9BiusC')
+TON_WALLET = os.getenv('TON_WALLET', 'UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY')
 
 def generate_ton_payment_link(chat_id, amount=10):
-    """Генерирует платежную ссылку для Telegram Wallet"""
-    return f"https://t.me/wallet?startattach=wpay_order-{chat_id}"
+    """Генерирует платежную ссылку для Tonkeeper"""
+    return f"https://app.tonkeeper.com/transfer/UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY?amount={amount*1000000000}&text=premium_{chat_id}"
 
 @app.route('/')
 def home():
