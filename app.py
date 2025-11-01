@@ -11,6 +11,11 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TON_WALLET = os.getenv('TON_WALLET', 'UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY')
 
+def generate_ton_payment_link(chat_id, amount=10):
+    """Генерирует платежную ссылку TON Wallet"""
+    # Пока заглушка - нужно изучить точный формат TON
+    return f"https://t.me/wallet?startattach=wpay_order-{chat_id}_{amount}TON"
+
 @app.route('/')
 def home():
     return jsonify({
@@ -68,12 +73,15 @@ def telegram_webhook():
                 )
                 
             elif text == "💰 Премиум подписка":
+                # Генерируем реальную платежную ссылку
+                payment_link = generate_ton_payment_link(chat_id)
+                
                 # Создаем инлайн-кнопку для оплаты
                 inline_keyboard = {
                     "inline_keyboard": [[
                         {
                             "text": "💳 Оплатить 10 TON", 
-                            "url": f"https://t.me/wallet?startattach=wpay_order-orderId&amount=10000000000"
+                            "url": payment_link  # ← Используем сгенерированную ссылку
                         }
                     ]]
                 }
