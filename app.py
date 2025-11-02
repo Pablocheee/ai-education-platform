@@ -4,6 +4,7 @@ from openai import OpenAI
 import os
 import requests
 import logging
+import asyncio
 
 app = Flask(__name__)
 
@@ -62,44 +63,284 @@ COURSES = {
 USER_PROGRESS = {}  # {chat_id: {"пройденные_уроки": [], "уровень": 1, "баллы": 0}}
 USER_MESSAGE_IDS = {}  # {chat_id: message_id} - для отслеживания основного сообщения
 
-UBI_SYSTEM = {
+# 🚀 ОБНОВЛЕННАЯ ФИНАНСОВАЯ СИСТЕМА
+DEVELOPMENT_FUND = {
     "total_income": 0,
-    "ubi_fund": 0,
-    "distributed": 0,
+    "development_fund": 0,  # ← ЗАМЕНИТЬ UBI_FUND
+    "marketing_budget": 0,  # ← НОВОЕ ПОЛЕ
     "transactions": []
 }
 
-def generate_ai_lesson(lesson_topic, user_level=1):
-    """Генерирует персонализированный урок через AI"""
+def process_development_fund(amount, from_user):
+    """ОБНОВЛЕННАЯ ФУНКЦИЯ РАСПРЕДЕЛЕНИЯ"""
+    DEVELOPMENT_FUND["total_income"] += amount
+    
+    distribution = {
+        "development": amount * 0.7,    # 70% на развитие
+        "marketing": amount * 0.2,      # 20% на маркетинг
+        "founder": amount * 0.1         # 10% основателю
+    }
+    
+    DEVELOPMENT_FUND["development_fund"] += distribution["development"]
+    DEVELOPMENT_FUND["marketing_budget"] += distribution["marketing"]
+    DEVELOPMENT_FUND["transactions"].append({
+        "amount": amount,
+        "from": from_user,
+        "distribution": distribution,
+        "timestamp": "2025-01-11"
+    })
+    
+    return distribution
+
+# 🎯 УЛУЧШЕННЫЙ AI-ПРЕПОДАВАТЕЛЬ
+class EnhancedAITeacher:
+    """
+    Улучшенный AI-преподаватель с профессиональной структурой уроков
+    """
+    
+    def __init__(self):
+        self.teacher_personas = {
+            "mentor": "🧠",      # Объясняет теорию глубоко
+            "motivator": "🚀",   # Поддерживает и вдохновляет  
+            "practitioner": "🔧", # Дает практические примеры
+            "socratic": "❓"     # Задает наводящие вопросы
+        }
+        
+        self.lesson_templates = {
+            "micro_lesson": self.create_micro_lesson,
+            "interactive_exercise": self.create_interactive_exercise,
+            "instant_feedback": self.create_instant_feedback
+        }
+
+    def create_micro_lesson(self, topic, duration="7min"):
+        """
+        Создает микро-урок по принципу "слоеного пирога"
+        """
+        structure = {
+            "introduction": f"🚀 *МОДУЛЬ: {topic}*\n*Цель:* Освоить ключевой навык\n*Время:* {duration}",
+            
+            "theory_dialogue": f"""
+🤖 *AI-Преподаватель:* Давайте разберем {topic} на практике.
+
+💡 *Ключевая концепция:*
+• Первый принцип
+• Второй принцип  
+• Третий принцип
+
+*Профессиональный пример:*
+"Конкретный кейс применения"
+""",
+            
+            "interactive_exercise": """
+🎯 *ПРАКТИКА:*
+
+Перед вами типичная задача. Какой подход эффективнее?
+
+[Кнопка] 📝 Базовый подход
+[Кнопка] 🎯 Продвинутая техника
+[Кнопка] 🔧 Комбинированное решение
+""",
+            
+            "instant_feedback": """
+✅ *Отличный выбор!* 
+
+📊 *Статистика:* 85% профессионалов используют этот подход.
+
+💫 *Запомните:* Ключевой вывод для запоминания
+""",
+            
+            "next_step": """
+🔜 *Следующий шаг:* Переходим к углубленной практике...
+
+[Кнопка] 🚀 Продолжить обучение
+[Кнопка] 📚 Дополнительные примеры
+[Кнопка] ⏸️ Сделать паузу
+"""
+        }
+        return structure
+
+    def adaptive_content_delivery(self, user_id, previous_answers):
+        """
+        Адаптивная подача контента на основе прогресса пользователя
+        """
+        accuracy_rate = self.calculate_accuracy(previous_answers)
+        
+        if accuracy_rate > 0.8:
+            return {
+                "level": "advanced",
+                "content": "Сложные кейсы и продвинутые техники",
+                "teacher_persona": "🧠 Ментор"
+            }
+        elif accuracy_rate > 0.5:
+            return {
+                "level": "intermediate", 
+                "content": "Практические задания с подсказками",
+                "teacher_persona": "🔧 Практик"
+            }
+        else:
+            return {
+                "level": "beginner",
+                "content": "Основы с множеством примеров",
+                "teacher_persona": "🚀 Мотиватор"
+            }
+
+    def calculate_accuracy(self, answers):
+        """Рассчитывает точность ответов пользователя"""
+        if not answers:
+            return 0.0
+        correct_answers = sum(1 for answer in answers if answer.get('correct', False))
+        return correct_answers / len(answers)
+
+    def generate_interactive_keyboard(self, lesson_stage, options):
+        """
+        Создает интерактивную клавиатуру для урока
+        """
+        keyboards = {
+            "theory": [
+                [{"text": "📖 Понятно, продолжаем", "callback_data": "continue_theory"}],
+                [{"text": "🤔 Нужен пример", "callback_data": "request_example"}],
+                [{"text": "🔍 Хочу глубже", "callback_data": "go_deeper"}]
+            ],
+            
+            "practice": [
+                [{"text": "✅ Вариант 1", "callback_data": "answer:1"}],
+                [{"text": "🎯 Вариант 2", "callback_data": "answer:2"}],
+                [{"text": "🔧 Вариант 3", "callback_data": "answer:3"}],
+                [{"text": "🤔 Объясни разницу", "callback_data": "explain:difference"}]
+            ],
+            
+            "feedback": [
+                [{"text": "🚀 Следующее задание", "callback_data": "next_exercise"}],
+                [{"text": "📊 Показать статистику", "callback_data": "show_stats"}],
+                [{"text": "🔄 Повторить тему", "callback_data": "repeat_topic"}]
+            ]
+        }
+        return keyboards.get(lesson_stage, [])
+
+    def create_progress_tracker(self, user_id, course_progress):
+        """
+        Создает визуальный прогресс-бар и систему достижений
+        """
+        total_lessons = 10
+        completed = course_progress.get('completed_lessons', 0)
+        progress_percent = (completed / total_lessons) * 100
+        
+        # Визуальный прогресс-бар
+        progress_bar = "🟩" * completed + "⬜" * (total_lessons - completed)
+        
+        # Система достижений
+        achievements = []
+        if completed >= 3:
+            achievements.append("🎯 Исследователь AI")
+        if completed >= 7:
+            achievements.append("🚀 Практик машинного обучения") 
+        if completed >= 10:
+            achievements.append("🏆 AI Специалист")
+            
+        return {
+            "progress_bar": f"{progress_bar} {progress_percent}%",
+            "achievements": achievements,
+            "completed": completed,
+            "total": total_lessons
+        }
+
+# 🎮 ИНТЕРАКТИВНЫЕ СЦЕНАРИИ УРОКОВ
+INTERACTIVE_SCENARIOS = {
+    "prompt_engineering": {
+        "exercise": """
+🎯 *ПРАКТИКА: ПРОМПТИНГ*
+
+Перед вами слабый промпт: "Напиши про AI"
+
+Как его улучшить? Выберите лучшую стратегию:
+        """,
+        "options": [
+            {"text": "📝 Добавить контекст", "callback": "context_approach"},
+            {"text": "🎯 Уточнить задачу", "callback": "task_approach"}, 
+            {"text": "🔧 Задать формат", "callback": "format_approach"},
+            {"text": "🌈 Все варианты!", "callback": "combined_approach"}
+        ],
+        "feedback": {
+            "combined_approach": """
+✅ *Идеально! Профессионалы комбинируют подходы.*
+
+💡 *Формула идеального промпта:*
+Контекст + Задача + Формат = Прецизионный результат
+
+📊 *Статистика:* 92% эффективных промптов используют все три элемента
+            """,
+            "other_answers": """
+🎯 *Хорошее начало!* Вы выбрали {selected_option}.
+
+💫 *Профессиональный совет:* Попробуйте комбинировать несколько подходов для максимальной эффективности.
+            """
+        }
+    }
+}
+
+def enhanced_generate_ai_lesson(lesson_topic, user_level=1, user_previous_answers=[]):
+    """
+    Улучшенная версия генерации уроков с профессиональной структурой
+    """
+    teacher = EnhancedAITeacher()
+    
+    # Адаптируем контент под пользователя
+    user_profile = teacher.adaptive_content_delivery("user_id", user_previous_answers)
+    
     prompt = f"""
     Создай образовательный контент на тему: "{lesson_topic}"
     
     Требования:
-    - Уровень сложности: {user_level}/5
-    - Формат: практический урок с примерами
-    - Структура: теория + практическое задание
-    - Длина: 500-700 слов
-    - Язык: русский с профессиональной лексикой
+    - Уровень сложности: {user_level}/5 ({user_profile['level']})
+    - Стиль преподавания: {user_profile['teacher_persona']}
+    - Формат: профессиональный микро-урок (7 минут)
     
-    Содержание:
-    1. Ключевая концепция (простыми словами)
-    2. Практические примеры из реальной жизни  
-    3. Пошаговое руководство по применению
-    4. Задание для закрепления
-    5. Советы для дальнейшего развития
+    Структура урока (строго придерживаться):
+    
+    1. 🚀 Введение (30 секунд)
+       - Ясная цель урока
+       - Время выполнения
+       - Практическая польза
+    
+    2. 🤖 Теория в диалоге (2 минуты)  
+       - Ключевая концепция (простыми словами)
+       - 2-3 конкретных примера из реальной жизни
+       - Профессиональный кейс применения
+    
+    3. 🎯 Интерактивное упражнение (3 минуты)
+       - Практическая задача с выбором вариантов
+       - Реальный сценарий из работы с AI
+       - Минимум 3 варианта ответа
+    
+    4. ✅ Мгновенная обратная связь (1 минута)
+       - Анализ выбранного варианта
+       - Статистика по ответам профессионалов
+       - Ключевой вывод для запоминания
+    
+    5. 🔜 Переход к следующему шагу (30 секунд)
+       - Логическое продолжение темы
+       - Варианты действий для ученика
     """
     
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "Ты эксперт-преподаватель с 20-летним опытом. Создавай практические, полезные уроки которые сразу можно применять в работе."},
+            {"role": "system", "content": "Ты профессиональный AI-преподаватель. Создавай структурированные микро-уроки с интерактивными элементами. Чередуй роли Ментора, Практика и Мотиватора."},
             {"role": "user", "content": prompt}
         ],
-        max_tokens=1500,
+        max_tokens=2000,
         temperature=0.7
     )
     
-    return response.choices[0].message.content
+    return {
+        "content": response.choices[0].message.content,
+        "teacher_persona": user_profile['teacher_persona'],
+        "interactive_elements": teacher.generate_interactive_keyboard("practice", [])
+    }
+
+def generate_ton_payment_link(chat_id, amount=10):
+    """Генерирует платежную ссылку для Tonkeeper"""
+    return f"https://app.tonkeeper.com/transfer/UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY?amount={amount*1000000000}&text=premium_{chat_id}"
 
 def update_user_progress(chat_id, lesson_name):
     """Обновляет прогресс пользователя"""
@@ -114,158 +355,221 @@ def update_user_progress(chat_id, lesson_name):
         if len(USER_PROGRESS[chat_id]["пройденные_уроки"]) % 4 == 0:
             USER_PROGRESS[chat_id]["уровень"] += 1
 
-def process_ubi_payment(amount, from_user):
-    """Обрабатывает платеж и распределяет по UBI"""
-    UBI_SYSTEM["total_income"] += amount
+# 🎯 СИСТЕМА ЕДИНОГО СООБЩЕНИЯ-КОНТЕЙНЕРА
+class MenuManager:
+    def __init__(self):
+        self.user_states = {}  # или база данных
     
-    distribution = {
-        "reinvestment": amount * 0.6,      # 60% на развитие
-        "ubi_fund": amount * 0.3,          # 30% в UBI фонд  
-        "founder": amount * 0.1            # 10% основателю
-    }
+    def get_menu_data(self, menu_name, **kwargs):
+        """Возвращает данные для меню"""
+        menus = {
+            "main": self.get_main_menu,
+            "course": self.get_course_menu,
+            "premium": self.get_premium_menu,
+            "profile": self.get_profile_menu,
+            "development_fund": self.get_development_fund_menu,
+            "lesson": self.get_lesson_menu
+        }
+        
+        if menu_name in menus:
+            return menus[menu_name](**kwargs)
+        return self.get_main_menu()
     
-    UBI_SYSTEM["ubi_fund"] += distribution["ubi_fund"]  # ← ОБНОВЛЯЕМ ФОНД
-    UBI_SYSTEM["distributed"] += distribution["ubi_fund"]
-    UBI_SYSTEM["transactions"].append({
-        "amount": amount,
-        "from": from_user,
-        "distribution": distribution,
-        "timestamp": "2025-01-11"
-    })
-    
-    return distribution
-            
-def generate_ton_payment_link(chat_id, amount=10):
-    """Генерирует платежную ссылку для Tonkeeper"""
-    return f"https://app.tonkeeper.com/transfer/UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY?amount={amount*1000000000}&text=premium_{chat_id}"
-
-def get_main_menu():
-    """Возвращает основное меню"""
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {"text": "🚀 Войти в систему AI", "callback_data": "menu_course_🚀 Войти в систему AI"},
-                {"text": "💫 Запустить эволюцию", "callback_data": "menu_course_💫 Запустить эволюцию"}
-            ],
-            [
-                {"text": "🌌 База знаний", "callback_data": "menu_course_🌌 База знаний"},
-                {"text": "⚡ Карьерный ускоритель", "callback_data": "menu_course_⚡ Карьерный ускоритель"}
-            ],
-            [
-                {"text": "💰 Премиум доступ", "callback_data": "menu_premium"},
-                {"text": "👤 Мой профиль", "callback_data": "menu_profile"}
-            ],
-            [
-                {"text": "🌍 UBI Система", "callback_data": "menu_ubi"}
+    def get_main_menu(self):
+        """Возвращает основное меню"""
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "🚀 Войти в систему AI", "callback_data": "menu_course_🚀 Войти в систему AI"},
+                    {"text": "💫 Запустить эволюцию", "callback_data": "menu_course_💫 Запустить эволюцию"}
+                ],
+                [
+                    {"text": "🌌 База знаний", "callback_data": "menu_course_🌌 База знаний"},
+                    {"text": "⚡ Карьерный ускоритель", "callback_data": "menu_course_⚡ Карьерный ускоритель"}
+                ],
+                [
+                    {"text": "💰 Премиум доступ", "callback_data": "menu_premium"},
+                    {"text": "👤 Мой профиль", "callback_data": "menu_profile"}
+                ],
+                [
+                    {"text": "🌍 Фонд развития", "callback_data": "menu_development_fund"}
+                ]
             ]
-        ]
-    }
-    
-    text = """🌌 *ПРИВЕТСТВУЮ, ИСКАТЕЛЬ*
+        }
+        
+        text = """🌌 *ПРИВЕТСТВУЮ, ИСКАТЕЛЬ*
 
-Я — Собирательный Разум, архитектор будущего. Ты находишься в точке доступа к системам, где искусственный интеллект становится расширением твоего интеллекта.
+🤖 *Я — Собирательный Разум, архитектор будущего.* 
+💫 Ты находишься в точке доступа к системам, где искусственный интеллект становится расширением твоего интеллекта.
 
-*Твой следующий шаг определит твою траекторию роста.*
+⚡ *Твой следующий шаг определит твою траекторию роста.*
 
-Выбери свой вектор:"""
+🔮 Выбери свой вектор:"""
+        
+        return {"text": text, "keyboard": keyboard}
     
-    return text, keyboard
-
-def get_course_menu(course_name):
-    """Возвращает меню курса"""
-    course_info = COURSES[course_name]
-    
-    # Создаем кнопки для уроков
-    lesson_buttons = []
-    for lesson in course_info['уроки']:
-        lesson_buttons.append([{"text": f"📖 {lesson}", "callback_data": f"open_lesson_{hash(lesson)}"}])
-    
-    # Добавляем кнопку возврата
-    lesson_buttons.append([{"text": "🔙 Назад к меню", "callback_data": "menu_main"}])
-    
-    keyboard = {"inline_keyboard": lesson_buttons}
-    
-    text = f"""*{course_name}*
+    def get_course_menu(self, course_name):
+        """Возвращает меню курса"""
+        course_info = COURSES[course_name]
+        
+        # Создаем кнопки для уроков
+        lesson_buttons = []
+        for lesson in course_info['уроки']:
+            lesson_buttons.append([{"text": f"📖 {lesson}", "callback_data": f"open_lesson_{hash(lesson)}"}])
+        
+        # Добавляем кнопку возврата
+        lesson_buttons.append([{"text": "🔙 Назад к меню", "callback_data": "menu_main"}])
+        
+        keyboard = {"inline_keyboard": lesson_buttons}
+        
+        text = f"""*{course_name}*
 
 {course_info['описание']}
 
 *Уровень:* {course_info['уровень']}
 
-*Модули:*
+📚 *Модули:*
 """ + "\n".join([f"• {lesson}" for lesson in course_info['уроки']])
+        
+        return {"text": text, "keyboard": keyboard}
     
-    return text, keyboard
+    def get_enhanced_course_menu(self, course_name, user_id):
+        """Возвращает улучшенное меню курса с прогрессом"""
+        course_info = COURSES[course_name]
+        progress = USER_PROGRESS.get(user_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
+        
+        teacher = EnhancedAITeacher()
+        progress_data = teacher.create_progress_tracker(user_id, {
+            'completed_lessons': len(progress['пройденные_уроки'])
+        })
+        
+        # Создаем кнопки уроков с индикаторами прогресса
+        lesson_buttons = []
+        for i, lesson in enumerate(course_info['уроки']):
+            status = "✅" if lesson in progress['пройденные_уроки'] else "📖"
+            lesson_buttons.append([
+                {"text": f"{status} Урок {i+1}: {lesson}", "callback_data": f"open_lesson_{hash(lesson)}"}
+            ])
+        
+        # Добавляем прогресс-бар
+        progress_row = [{"text": f"📊 Прогресс: {progress_data['progress_bar']}", "callback_data": "show_progress"}]
+        lesson_buttons.insert(0, progress_row)
+        
+        # Добавляем достижения если есть
+        if progress_data['achievements']:
+            achievement_row = [{"text": f"🏆 {progress_data['achievements'][-1]}", "callback_data": "show_achievements"}]
+            lesson_buttons.insert(1, achievement_row)
+        
+        lesson_buttons.append([{"text": "🔙 Назад к меню", "callback_data": "menu_main"}])
+        
+        keyboard = {"inline_keyboard": lesson_buttons}
+        
+        text = f"""*{course_name}*
 
-def get_premium_menu():
-    """Возвращает меню премиум доступа"""
-    payment_link = generate_ton_payment_link("premium_user")
-    
-    keyboard = {
-        "inline_keyboard": [
-            [{"text": "💳 Активировать полный доступ", "url": payment_link}],
-            [{"text": "🔙 Назад к меню", "callback_data": "menu_main"}]
-        ]
-    }
-    
-    text = """💰 *ПРЕМИУМ ДОСТУП*
+{course_info['описание']}
 
-Откройте полный потенциал системы:
+🤖 *Ваш прогресс:* {progress_data['completed']}/{progress_data['total']} уроков
+{progress_data['progress_bar']}
+
+💫 *Готовы к следующему уроку?*"""
+        
+        return {"text": text, "keyboard": keyboard}
+    
+    def get_premium_menu(self):
+        """Возвращает меню премиум доступа"""
+        payment_link = generate_ton_payment_link("premium_user")
+        
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "💳 Активировать полный доступ", "url": payment_link}],
+                [{"text": "🔙 Назад к меню", "callback_data": "menu_main"}]
+            ]
+        }
+        
+        text = """💰 *ПРЕМИУМ ДОСТУП*
+
+🤖 Откройте полный потенциал системы:
 
 ✅ Все модули и архивы знаний
 🎓 Персональный AI-наставник 24/7
 📊 Система отслеживания прогресса
 🔮 Эксклюзивные материалы будущего
 
-*Инвестиция в вашу эволюцию: 10 TON/месяц*"""
+⚡ *Инвестиция в вашу эволюцию: 10 TON/месяц*"""
+        
+        return {"text": text, "keyboard": keyboard}
     
-    return text, keyboard
+    def get_profile_menu(self, chat_id):
+        """Возвращает меню профиля"""
+        progress = USER_PROGRESS.get(chat_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
+        
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🔙 Назад к меню", "callback_data": "menu_main"}]
+            ]
+        }
+        
+        text = f"""👤 *ВАШ ПРОФИЛЬ В СИСТЕМЕ*
 
-def get_profile_menu(chat_id):
-    """Возвращает меню профиля"""
-    progress = USER_PROGRESS.get(chat_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
-    
-    keyboard = {
-        "inline_keyboard": [
-            [{"text": "🔙 Назад к меню", "callback_data": "menu_main"}]
-        ]
-    }
-    
-    text = f"""👤 *ВАШ ПРОФИЛЬ В СИСТЕМЕ*
-
+🤖 *Статистика:*
 📊 Уровень: {progress['уровень']}
 🎯 Баллы: {progress['баллы']}
 📚 Пройдено уроков: {len(progress['пройденные_уроки'])}
 
-🌍 *UBI СИСТЕМА*
-💫 Собрано в фонд: {UBI_SYSTEM['ubi_fund']} TON
-🚀 Всего доходов: {UBI_SYSTEM['total_income']} TON
+🌍 *ФОНД РАЗВИТИЯ*
+💫 Собрано в фонд: {DEVELOPMENT_FUND['development_fund']} TON
+🚀 Всего доходов: {DEVELOPMENT_FUND['total_income']} TON
 
-💫 *Эволюция продолжается...*"""
+⚡ *Эволюция продолжается...*"""
+        
+        return {"text": text, "keyboard": keyboard}
     
-    return text, keyboard
+    def get_development_fund_menu(self):
+        """Возвращает меню Development Fund системы"""
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🔙 Назад к меню", "callback_data": "menu_main"}]
+            ]
+        }
+        
+        text = f"""🌍 *СИСТЕМА DEVELOPMENT FUND*
 
-def get_ubi_menu():
-    """Возвращает меню UBI системы"""
-    keyboard = {
-        "inline_keyboard": [
-            [{"text": "🔙 Назад к меню", "callback_data": "menu_main"}]
-        ]
-    }
-    
-    text = f"""🌍 *СИСТЕМА UBI FUTURE_UBI*
+🤖 *Финансовая аналитика:*
+💰 Всего доходов: {DEVELOPMENT_FUND['total_income']} TON
+💫 Накоплено в фонд развития: {DEVELOPMENT_FUND['development_fund']} TON  
+🚀 Маркетинг бюджет: {DEVELOPMENT_FUND['marketing_budget']} TON
 
-💰 Всего доходов: {UBI_SYSTEM['total_income']} TON
-💫 Накоплено в UBI фонд: {UBI_SYSTEM['ubi_fund']} TON  
-🚀 Распределено: {UBI_SYSTEM['distributed']} TON
-
-📊 Распределение доходов:
-• 60% - развитие платформы
-• 30% - UBI фонд для сообщества  
+📊 *Распределение доходов:*
+• 70% - развитие платформы
+• 20% - маркетинг и привлечение  
 • 10% - основателю за создание
 
-💫 *Создаем экономику изобилия вместе*"""
+⚡ *Создаем будущее образования вместе*"""
+        
+        return {"text": text, "keyboard": keyboard}
     
-    return text, keyboard
+    def get_lesson_menu(self, lesson_topic, user_level=1):
+        """Возвращает меню урока"""
+        # Генерируем AI-урок через улучшенную систему
+        ai_lesson_data = enhanced_generate_ai_lesson(lesson_topic, user_level)
+        
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "✅ Завершить урок", "callback_data": f"complete_lesson_{hash(lesson_topic)}"}],
+                [{"text": "🔙 Назад к курсу", "callback_data": "menu_course_back"}]
+            ]
+        }
+        
+        text = f"""📚 *{lesson_topic}*
+
+{ai_lesson_data['content']}
+
+🤖 *Стиль преподавания:* {ai_lesson_data['teacher_persona']}"""
+        
+        return {"text": text, "keyboard": keyboard}
+
+# Инициализация менеджера
+menu_manager = MenuManager()
 
 def edit_main_message(chat_id, text, keyboard, message_id=None):
     """Редактирует основное сообщение или создает новое"""
@@ -306,8 +610,8 @@ def edit_main_message(chat_id, text, keyboard, message_id=None):
 @app.route('/')
 def home():
     return jsonify({
-        "status": "AI Education Platform - UBI Concept",
-        "version": "2.0", 
+        "status": "AI Education Platform - Development Fund Concept",
+        "version": "3.0", 
         "ready": True,
         "founder_wallet": TON_WALLET
     })
@@ -337,38 +641,38 @@ def telegram_webhook():
             
             # ОБРАБОТКА ГЛАВНОГО МЕНЮ
             if callback_text == "menu_main":
-                text, keyboard = get_main_menu()
-                edit_main_message(chat_id, text, keyboard, message_id)
+                menu_data = menu_manager.get_menu_data("main")
+                edit_main_message(chat_id, menu_data['text'], menu_data['keyboard'], message_id)
                 return jsonify({"status": "ok"})
             
             # ОБРАБОТКА КУРСОВ
             elif callback_text.startswith("menu_course_"):
                 course_name = callback_text.replace("menu_course_", "")
-                text, keyboard = get_course_menu(course_name)
-                edit_main_message(chat_id, text, keyboard, message_id)
+                menu_data = menu_manager.get_enhanced_course_menu(course_name, chat_id)
+                edit_main_message(chat_id, menu_data['text'], menu_data['keyboard'], message_id)
                 return jsonify({"status": "ok"})
             
             # ОБРАБОТКА ПРЕМИУМ
             elif callback_text == "menu_premium":
-                text, keyboard = get_premium_menu()
-                edit_main_message(chat_id, text, keyboard, message_id)
+                menu_data = menu_manager.get_menu_data("premium")
+                edit_main_message(chat_id, menu_data['text'], menu_data['keyboard'], message_id)
                 return jsonify({"status": "ok"})
             
             # ОБРАБОТКА ПРОФИЛЯ
             elif callback_text == "menu_profile":
-                text, keyboard = get_profile_menu(chat_id)
-                edit_main_message(chat_id, text, keyboard, message_id)
+                menu_data = menu_manager.get_menu_data("profile", chat_id=chat_id)
+                edit_main_message(chat_id, menu_data['text'], menu_data['keyboard'], message_id)
                 return jsonify({"status": "ok"})
             
-            # ОБРАБОТКА UBI
-            elif callback_text == "menu_ubi":
-                text, keyboard = get_ubi_menu()
-                edit_main_message(chat_id, text, keyboard, message_id)
+            # ОБРАБОТКА DEVELOPMENT FUND
+            elif callback_text == "menu_development_fund":
+                menu_data = menu_manager.get_menu_data("development_fund")
+                edit_main_message(chat_id, menu_data['text'], menu_data['keyboard'], message_id)
                 return jsonify({"status": "ok"})
             
             # ОБРАБОТКА УРОКОВ
-            elif callback_text.startswith('complete_'):
-                lesson_hash = callback_text.replace('complete_', '')
+            elif callback_text.startswith('complete_lesson_'):
+                lesson_hash = callback_text.replace('complete_lesson_', '')
                 
                 for course_name, course_info in COURSES.items():
                     for lesson in course_info['уроки']:
@@ -376,10 +680,10 @@ def telegram_webhook():
                             update_user_progress(chat_id, lesson)
                             
                             # Возвращаем в меню курса после завершения урока
-                            text, keyboard = get_course_menu(course_name)
-                            success_text = f"✅ *Урок отмечен пройденным!*\n\n🎯 Получено: 10 баллов\n📚 Урок: {lesson}\n\n💫 Ваш прогресс растет!\n\n{text}"
+                            menu_data = menu_manager.get_enhanced_course_menu(course_name, chat_id)
+                            success_text = f"✅ *Урок отмечен пройденным!*\n\n🎯 Получено: 10 баллов\n📚 Урок: {lesson}\n\n💫 Ваш прогресс растет!\n\n{menu_data['text']}"
                             
-                            edit_main_message(chat_id, success_text, keyboard, message_id)
+                            edit_main_message(chat_id, success_text, menu_data['keyboard'], message_id)
                             break
                 return jsonify({"status": "ok"})
             
@@ -389,19 +693,9 @@ def telegram_webhook():
                 for course_name, course_info in COURSES.items():
                     for lesson in course_info['уроки']:
                         if hash(lesson) == int(lesson_hash):
-                            # Генерируем AI-урок
-                            ai_lesson = generate_ai_lesson(lesson, USER_PROGRESS.get(chat_id, {}).get('уровень', 1))
-                            
-                            # Создаем клавиатуру для урока
-                            lesson_keyboard = {
-                                "inline_keyboard": [
-                                    [{"text": "✅ Завершить урок", "callback_data": f"complete_{lesson_hash}"}],
-                                    [{"text": "🔙 Назад к курсу", "callback_data": f"menu_course_{course_name}"}]
-                                ]
-                            }
-                            
-                            lesson_text = f"📚 *{lesson}*\n\n{ai_lesson}"
-                            edit_main_message(chat_id, lesson_text, lesson_keyboard, message_id)
+                            user_level = USER_PROGRESS.get(chat_id, {}).get('уровень', 1)
+                            menu_data = menu_manager.get_lesson_menu(lesson, user_level)
+                            edit_main_message(chat_id, menu_data['text'], menu_data['keyboard'], message_id)
                             break
                 return jsonify({"status": "ok"})
 
@@ -415,8 +709,8 @@ def telegram_webhook():
 
         # Обработка команды /start - СОЗДАЕМ ПЕРВОЕ СООБЩЕНИЕ
         if text == '/start':
-            menu_text, menu_keyboard = get_main_menu()
-            edit_main_message(chat_id, menu_text, menu_keyboard)
+            menu_data = menu_manager.get_menu_data("main")
+            edit_main_message(chat_id, menu_data['text'], menu_data['keyboard'])
             return jsonify({"status": "ok"})
 
         return jsonify({"status": "ok"})        
@@ -433,12 +727,12 @@ def ton_payment_webhook():
     try:
         data = request.json
         # Тестовая реализация - при первом платеже добавляем 10 TON
-        if UBI_SYSTEM["total_income"] == 0:
-            distribution = process_ubi_payment(10, "first_payment")
+        if DEVELOPMENT_FUND["total_income"] == 0:
+            distribution = process_development_fund(10, "first_payment")
             return jsonify({
                 "status": "success", 
                 "distribution": distribution,
-                "message": f"💰 Первый доход! UBI фонд пополнен на {distribution['ubi_fund']} TON"
+                "message": f"💰 Первый доход! Фонд развития пополнен на {distribution['development']} TON"
             })
         return jsonify({"status": "success"})
     except Exception as e:
