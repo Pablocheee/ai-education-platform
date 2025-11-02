@@ -1,3 +1,4 @@
+import httpx
 from flask import Flask, request, jsonify
 from openai import OpenAI
 import os
@@ -7,7 +8,7 @@ import logging
 app = Flask(__name__)
 
 # Настройка API ключей
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'), http_client=httpx.Client())
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TON_WALLET = os.getenv('TON_WALLET', 'UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY')
 
