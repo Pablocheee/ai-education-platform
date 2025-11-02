@@ -105,12 +105,6 @@ class EnhancedAITeacher:
             "practitioner": "🔧", # Дает практические примеры
             "socratic": "❓"     # Задает наводящие вопросы
         }
-        
-        self.lesson_templates = {
-            "micro_lesson": self.create_micro_lesson,
-            "interactive_exercise": self.create_interactive_exercise,
-            "instant_feedback": self.create_instant_feedback
-        }
 
     def create_micro_lesson(self, topic, duration="7min"):
         """
@@ -158,6 +152,18 @@ class EnhancedAITeacher:
 """
         }
         return structure
+
+    def create_interactive_exercise(self):
+        """Создает интерактивное упражнение"""
+        return {
+            "question": "🎯 Практическое задание",
+            "options": ["Вариант 1", "Вариант 2", "Вариант 3"],
+            "correct_answer": 0
+        }
+    
+    def create_instant_feedback(self, user_answer):
+        """Создает мгновенную обратную связь"""
+        return "✅ Отлично! Вы правильно ответили."
 
     def adaptive_content_delivery(self, user_id, previous_answers):
         """
