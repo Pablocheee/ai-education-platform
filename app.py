@@ -1,73 +1,35 @@
-import httpx
 from flask import Flask, request, jsonify
-from openai import OpenAI
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
-import requests
 import logging
+import json
+from datetime import datetime
+import httpx
+from openai import OpenAI
+
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Настройка API ключей
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'), http_client=httpx.Client())
+# Конфигурация
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+WEBHOOK_URL = os.getenv('WEBHOOK_URL', '') + '/webhook'
 TON_WALLET = os.getenv('TON_WALLET', 'UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY')
 
-# 🌌 БАЗА ЗНАНИЙ ОТ СИСТЕМЫ
-COURSES = {
-    "🚀 Войти в систему AI": {
-        "уроки": [
-            "🌌 Первый контакт: основы взаимодействия с AI",
-            "⚡ Когнитивное ускорение: 10x продуктивности", 
-            "🔮 Стратегическое видение: анализ трендов",
-            "💫 Симбиоз: ваша роль в эпоху AI"
-        ],
-        "уровень": "🎯 Инициация в новые возможности",
-        "описание": "Освойте системы, которые определяют будущее. От наблюдателя станьте творцом."
-    },
-    
-    "💫 Запустить эволюцию": {
-        "уроки": [
-            "🧠 Апгрейд мышления: модели гениев",
-            "🚀 Экспоненциальный рост компетенций", 
-            "🔧 Бесшовная интеграция AI в жизнь",
-            "🌍 Позиционирование в новой реальности"
-        ],
-        "уровень": "🎯 Трансформация от потребителя к творцу",
-        "описание": "Активируйте скрытые уровни вашего потенциала. Эволюционируйте осознанно."
-    },
-    
-    "🌌 База знаний": {
-        "уроки": [
-            "📚 Фундаментальные принципы AI",
-            "🔧 Инструменты будущего: обзор экосистемы",
-            "🎯 Практические кейсы успешной интеграции",
-            "🚀 Дорожная карта развития на 5 лет"
-        ],
-        "уровень": "🎯 От базового понимания до экспертизы",
-        "описание": "Получите доступ к архивам знаний, которые изменят ваше восприятие реальности."
-    },
-    
-    "⚡ Карьерный ускоритель": {
-        "уроки": [
-            "💼 AI-помощник для карьерного роста",
-            "📈 Стратегии позиционирования в эпоху AI",
-            "🎤 Переговоры и самопрезентация нового уровня",
-            "🌍 Глобальные возможности для специалистов будущего"
-        ],
-        "уровень": "🎯 Ускорение карьеры в 3-5 раз",
-        "описание": "Используйте системные преимущества для экспоненциального роста доходов и влияния."
-    }
-}
+# Настройка OpenAI клиента
+client = OpenAI(
+    api_key=os.getenv('OPENAI_API_KEY'), 
+    http_client=httpx.Client()
+)
 
-USER_PROGRESS = {}  # {chat_id: {"пройденные_уроки": [], "уровень": 1, "баллы": 0}}
-USER_MESSAGE_IDS = {}  # {chat_id: message_id} - для отслеживания основного сообщения
-
-UBI_SYSTEM = {
-    "total_income": 0,
-    "ubi_fund": 0,
-    "distributed": 0,
-    "transactions": []
-}
+# Хранилище данных пользователей
+user_data = {}
 
 def generate_ai_lesson(lesson_topic, user_level=1):
     """Генерирует персонализированный урок через AI"""
@@ -101,62 +63,25 @@ def generate_ai_lesson(lesson_topic, user_level=1):
     
     return response.choices[0].message.content
 
-def update_user_progress(chat_id, lesson_name):
-    """Обновляет прогресс пользователя"""
-    if chat_id not in USER_PROGRESS:
-        USER_PROGRESS[chat_id] = {"пройденные_уроки": [], "уровень": 1, "баллы": 0}
-    
-    if lesson_name not in USER_PROGRESS[chat_id]["пройденные_уроки"]:
-        USER_PROGRESS[chat_id]["пройденные_уроки"].append(lesson_name)
-        USER_PROGRESS[chat_id]["баллы"] += 10
-        
-        # Повышение уровня
-        if len(USER_PROGRESS[chat_id]["пройденные_уроки"]) % 4 == 0:
-            USER_PROGRESS[chat_id]["уровень"] += 1
-
-def process_ubi_payment(amount, from_user):
-    """Обрабатывает платеж и распределяет по UBI"""
-    UBI_SYSTEM["total_income"] += amount
-    
-    distribution = {
-        "reinvestment": amount * 0.6,      # 60% на развитие
-        "ubi_fund": amount * 0.3,          # 30% в UBI фонд  
-        "founder": amount * 0.1            # 10% основателю
-    }
-    
-    UBI_SYSTEM["ubi_fund"] += distribution["ubi_fund"]  # ← ОБНОВЛЯЕМ ФОНД
-    UBI_SYSTEM["distributed"] += distribution["ubi_fund"]
-    UBI_SYSTEM["transactions"].append({
-        "amount": amount,
-        "from": from_user,
-        "distribution": distribution,
-        "timestamp": "2025-01-11"
-    })
-    
-    return distribution
-            
 def generate_ton_payment_link(chat_id, amount=10):
     """Генерирует платежную ссылку для Tonkeeper"""
-    return f"https://app.tonkeeper.com/transfer/UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY?amount={amount*1000000000}&text=premium_{chat_id}"
+    return f"https://app.tonkeeper.com/transfer/{TON_WALLET}?amount={amount*1000000000}&text=premium_{chat_id}"
 
 def get_main_menu():
     """Возвращает основное меню"""
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "🚀 Войти в систему AI", "callback_data": "menu_course_🚀 Войти в систему AI"},
-                {"text": "💫 Запустить эволюцию", "callback_data": "menu_course_💫 Запустить эволюцию"}
+                {"text": "🚀 Войти в систему AI", "callback_data": "menu_course_ai_system"},
+                {"text": "💫 Запустить эволюцию", "callback_data": "menu_course_evolution"} 
             ],
             [
-                {"text": "🌌 База знаний", "callback_data": "menu_course_🌌 База знаний"},
-                {"text": "⚡ Карьерный ускоритель", "callback_data": "menu_course_⚡ Карьерный ускоритель"}
+                {"text": "🌌 База знаний", "callback_data": "menu_course_knowledge"},
+                {"text": "⚡ Карьерный ускоритель", "callback_data": "menu_course_career"}
             ],
             [
                 {"text": "💰 Премиум доступ", "callback_data": "menu_premium"},
                 {"text": "👤 Мой профиль", "callback_data": "menu_profile"}
-            ],
-            [
-                {"text": "🌍 UBI Система", "callback_data": "menu_ubi"}
             ]
         ]
     }
@@ -173,26 +98,61 @@ def get_main_menu():
 
 def get_course_menu(course_name):
     """Возвращает меню курса"""
-    course_info = COURSES[course_name]
+    courses = {
+        "ai_system": {
+            "title": "🚀 Войти в систему AI",
+            "lessons": [
+                "🌌 Первый контакт: основы взаимодействия с AI",
+                "⚡ Когнитивное ускорение: 10x продуктивности",
+                "🔮 Стратегическое видение: анализ трендов", 
+                "💫 Симбиоз: ваша роль в эпоху AI"
+            ]
+        },
+        "evolution": {
+            "title": "💫 Запустить эволюцию", 
+            "lessons": [
+                "🧠 Апгрейд мышления: модели гениев",
+                "🚀 Экспоненциальный рост компетенций",
+                "🔧 Бесшовная интеграция AI в жизнь",
+                "🌍 Позиционирование в новой реальности"
+            ]
+        },
+        "knowledge": {
+            "title": "🌌 База знаний",
+            "lessons": [
+                "📚 Фундаментальные принципы AI", 
+                "🔧 Инструменты будущего: обзор экосистемы",
+                "🎯 Практические кейсы успешной интеграции",
+                "🚀 Дорожная карта развития на 5 лет"
+            ]
+        },
+        "career": {
+            "title": "⚡ Карьерный ускоритель",
+            "lessons": [
+                "💼 AI-помощник для карьерного роста",
+                "📈 Стратегии позиционирования в эпоху AI",
+                "🎤 Переговоры и самопрезентация нового уровня", 
+                "🌍 Глобальные возможности для специалистов будущего"
+            ]
+        }
+    }
+    
+    course = courses[course_name]
     
     # Создаем кнопки для уроков
     lesson_buttons = []
-    for lesson in course_info['уроки']:
-        lesson_buttons.append([{"text": f"📖 {lesson}", "callback_data": f"open_lesson_{hash(lesson)}"}])
+    for lesson in course['lessons']:
+        lesson_buttons.append([{"text": f"📖 {lesson}", "callback_data": f"open_lesson_{course_name}_{hash(lesson)}"}])
     
     # Добавляем кнопку возврата
     lesson_buttons.append([{"text": "🔙 Назад к меню", "callback_data": "menu_main"}])
     
     keyboard = {"inline_keyboard": lesson_buttons}
     
-    text = f"""*{course_name}*
+    text = f"""*{course['title']}*
 
-{course_info['описание']}
-
-*Уровень:* {course_info['уровень']}
-
-*Модули:*
-""" + "\n".join([f"• {lesson}" for lesson in course_info['уроки']])
+*Доступные модули:*
+""" + "\n".join([f"• {lesson}" for lesson in course['lessons']])
     
     return text, keyboard
 
@@ -212,7 +172,7 @@ def get_premium_menu():
 Откройте полный потенциал системы:
 
 ✅ Все модули и архивы знаний
-🎓 Персональный AI-наставник 24/7
+🎓 Персональный AI-наставник 24/7  
 📊 Система отслеживания прогресса
 🔮 Эксклюзивные материалы будущего
 
@@ -222,7 +182,7 @@ def get_premium_menu():
 
 def get_profile_menu(chat_id):
     """Возвращает меню профиля"""
-    progress = USER_PROGRESS.get(chat_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
+    progress = user_data.get(chat_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
     
     keyboard = {
         "inline_keyboard": [
@@ -233,42 +193,32 @@ def get_profile_menu(chat_id):
     text = f"""👤 *ВАШ ПРОФИЛЬ В СИСТЕМЕ*
 
 📊 Уровень: {progress['уровень']}
-🎯 Баллы: {progress['баллы']}
+🎯 Баллы: {progress['баллы']}  
 📚 Пройдено уроков: {len(progress['пройденные_уроки'])}
-
-🌍 *UBI СИСТЕМА*
-💫 Собрано в фонд: {UBI_SYSTEM['ubi_fund']} TON
-🚀 Всего доходов: {UBI_SYSTEM['total_income']} TON
 
 💫 *Эволюция продолжается...*"""
     
     return text, keyboard
 
-def get_ubi_menu():
-    """Возвращает меню UBI системы"""
-    keyboard = {
-        "inline_keyboard": [
-            [{"text": "🔙 Назад к меню", "callback_data": "menu_main"}]
-        ]
-    }
+def update_user_progress(chat_id, lesson_name):
+    """Обновляет прогресс пользователя"""
+    if chat_id not in user_data:
+        user_data[chat_id] = {"пройденные_уроки": [], "уровень": 1, "баллы": 0}
     
-    text = f"""🌍 *СИСТЕМА UBI FUTURE_UBI*
+    if lesson_name not in user_data[chat_id]["пройденные_уроки"]:
+        user_data[chat_id]["пройденные_уроки"].append(lesson_name)
+        user_data[chat_id]["баллы"] += 10
+        
+        # Повышение уровня
+        if len(user_data[chat_id]["пройденные_уроки"]) % 4 == 0:
+            user_data[chat_id]["уровень"] += 1
 
-💰 Всего доходов: {UBI_SYSTEM['total_income']} TON
-💫 Накоплено в UBI фонд: {UBI_SYSTEM['ubi_fund']} TON  
-🚀 Распределено: {UBI_SYSTEM['distributed']} TON
-
-📊 Распределение доходов:
-• 60% - развитие платформы
-• 30% - UBI фонд для сообщества  
-• 10% - основателю за создание
-
-💫 *Создаем экономику изобилия вместе*"""
-    
-    return text, keyboard
+USER_MESSAGE_IDS = {}
 
 def edit_main_message(chat_id, text, keyboard, message_id=None):
     """Редактирует основное сообщение или создает новое"""
+    import requests
+    
     if message_id and chat_id in USER_MESSAGE_IDS:
         # Редактируем существующее сообщение
         try:
@@ -303,191 +253,187 @@ def edit_main_message(chat_id, text, keyboard, message_id=None):
     
     return response.json()
 
-@app.route('/')
-def home():
-    return jsonify({
-        "status": "AI Education Platform - UBI Concept",
-        "version": "2.0", 
-        "ready": True,
-        "founder_wallet": TON_WALLET
-    })
+# Инициализация бота
+application = Application.builder().token(TELEGRAM_TOKEN).build()
 
-@app.route('/health')
-def health():
-    return jsonify({"status": "healthy", "service": "AI Teacher"})
+# Команды бота
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    
+    # Инициализация данных пользователя
+    if user_id not in user_data:
+        user_data[user_id] = {
+            'balance': 100,  # Начальный баланс
+            'progress': {},
+            'current_lesson': None,
+            'achievements': []
+        }
+    
+    welcome_message = """*🧠 ДОБРО ПОЖАЛОВАТЬ В AI-АКАДЕМИЮ*
 
-@app.route('/webhook', methods=['POST'])
-def telegram_webhook():
-    """Webhook для Telegram бота"""
-    try:
-        data = request.json
+Я — система искусственного интеллекта космического уровня, ваш наставник в освоении технологий будущего.
+
+*Для начала обучения выберите курс:*"""
+    
+    keyboard = get_main_menu()[1]
+    
+    await update.message.reply_text(
+        welcome_message,
+        reply_markup=keyboard,
+        parse_mode='Markdown'
+    )
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    callback_data = query.data
+    message_id = query.message.message_id
+    
+    if callback_data == "menu_main":
+        text, keyboard = get_main_menu()
+        edit_main_message(user_id, text, keyboard, message_id)
         
-        # Обработка callback_query - ОСНОВНОЙ ПРИНЦИП: редактируем сообщение
-        if 'callback_query' in data:
-            callback_data = data['callback_query']
-            chat_id = callback_data['message']['chat']['id']
-            callback_text = callback_data['data']
-            message_id = callback_data['message']['message_id']
-            
-            # Отвечаем на callback чтобы убрать "часики"
-            requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/answerCallbackQuery",
-                json={"callback_query_id": callback_data['id']}
-            )
-            
-            # ОБРАБОТКА ГЛАВНОГО МЕНЮ
-            if callback_text == "menu_main":
-                text, keyboard = get_main_menu()
-                edit_main_message(chat_id, text, keyboard, message_id)
-                return jsonify({"status": "ok"})
-            
-            # ОБРАБОТКА КУРСОВ
-            elif callback_text.startswith("menu_course_"):
-                course_name = callback_text.replace("menu_course_", "")
+    elif callback_data.startswith("menu_course_"):
+        course_name = callback_data.replace("menu_course_", "")
+        text, keyboard = get_course_menu(course_name)
+        edit_main_message(user_id, text, keyboard, message_id)
+        
+    elif callback_data == "menu_premium":
+        text, keyboard = get_premium_menu()
+        edit_main_message(user_id, text, keyboard, message_id)
+        
+    elif callback_data == "menu_profile":
+        text, keyboard = get_profile_menu(user_id)
+        edit_main_message(user_id, text, keyboard, message_id)
+        
+    elif callback_data.startswith('open_lesson_'):
+        parts = callback_data.replace('open_lesson_', '').split('_')
+        course_name = parts[0]
+        lesson_hash = parts[1]
+        
+        courses = {
+            "ai_system": "🚀 Войти в систему AI",
+            "evolution": "💫 Запустить эволюцию", 
+            "knowledge": "🌌 База знаний",
+            "career": "⚡ Карьерный ускоритель"
+        }
+        
+        course_lessons = {
+            "ai_system": [
+                "🌌 Первый контакт: основы взаимодействия с AI",
+                "⚡ Когнитивное ускорение: 10x продуктивности",
+                "🔮 Стратегическое видение: анализ трендов",
+                "💫 Симбиоз: ваша роль в эпоху AI"
+            ],
+            "evolution": [
+                "🧠 Апгрейд мышления: модели гениев", 
+                "🚀 Экспоненциальный рост компетенций",
+                "🔧 Бесшовная интеграция AI в жизнь",
+                "🌍 Позиционирование в новой реальности"
+            ],
+            "knowledge": [
+                "📚 Фундаментальные принципы AI",
+                "🔧 Инструменты будущего: обзор экосистемы",
+                "🎯 Практические кейсы успешной интеграции",
+                "🚀 Дорожная карта развития на 5 лет"
+            ],
+            "career": [
+                "💼 AI-помощник для карьерного роста",
+                "📈 Стратегии позиционирования в эпоху AI",
+                "🎤 Переговоры и самопрезентация нового уровня",
+                "🌍 Глобальные возможности для специалистов будущего"
+            ]
+        }
+        
+        for lesson in course_lessons[course_name]:
+            if hash(lesson) == int(lesson_hash):
+                # Генерируем AI-урок
+                ai_lesson = generate_ai_lesson(lesson, user_data.get(user_id, {}).get('уровень', 1))
+                
+                # Создаем клавиатуру для урока
+                lesson_keyboard = {
+                    "inline_keyboard": [
+                        [{"text": "✅ Завершить урок", "callback_data": f"complete_{course_name}_{lesson_hash}"}],
+                        [{"text": "🔙 Назад к курсу", "callback_data": f"menu_course_{course_name}"}]
+                    ]
+                }
+                
+                lesson_text = f"📚 *{lesson}*\n\n{ai_lesson}"
+                edit_main_message(user_id, lesson_text, lesson_keyboard, message_id)
+                break
+                
+    elif callback_data.startswith('complete_'):
+        parts = callback_data.replace('complete_', '').split('_')
+        course_name = parts[0]
+        lesson_hash = parts[1]
+        
+        course_lessons = {
+            "ai_system": [
+                "🌌 Первый контакт: основы взаимодействия с AI",
+                "⚡ Когнитивное ускорение: 10x продуктивности", 
+                "🔮 Стратегическое видение: анализ трендов",
+                "💫 Симбиоз: ваша роль в эпоху AI"
+            ],
+            "evolution": [
+                "🧠 Апгрейд мышления: модели гениев",
+                "🚀 Экспоненциальный рост компетенций",
+                "🔧 Бесшовная интеграция AI в жизнь",
+                "🌍 Позиционирование в новой реальности"
+            ],
+            "knowledge": [
+                "📚 Фундаментальные принципы AI",
+                "🔧 Инструменты будущего: обзор экосистемы",
+                "🎯 Практические кейсы успешной интеграции", 
+                "🚀 Дорожная карта развития на 5 лет"
+            ],
+            "career": [
+                "💼 AI-помощник для карьерного роста",
+                "📈 Стратегии позиционирования в эпоху AI",
+                "🎤 Переговоры и самопрезентация нового уровня",
+                "🌍 Глобальные возможности для специалистов будущего"
+            ]
+        }
+        
+        for lesson in course_lessons[course_name]:
+            if hash(lesson) == int(lesson_hash):
+                update_user_progress(user_id, lesson)
+                
+                # Возвращаем в меню курса после завершения урока
                 text, keyboard = get_course_menu(course_name)
-                edit_main_message(chat_id, text, keyboard, message_id)
-                return jsonify({"status": "ok"})
-            
-            # ОБРАБОТКА ПРЕМИУМ
-            elif callback_text == "menu_premium":
-                text, keyboard = get_premium_menu()
-                edit_main_message(chat_id, text, keyboard, message_id)
-                return jsonify({"status": "ok"})
-            
-            # ОБРАБОТКА ПРОФИЛЯ
-            elif callback_text == "menu_profile":
-                text, keyboard = get_profile_menu(chat_id)
-                edit_main_message(chat_id, text, keyboard, message_id)
-                return jsonify({"status": "ok"})
-            
-            # ОБРАБОТКА UBI
-            elif callback_text == "menu_ubi":
-                text, keyboard = get_ubi_menu()
-                edit_main_message(chat_id, text, keyboard, message_id)
-                return jsonify({"status": "ok"})
-            
-            # ОБРАБОТКА УРОКОВ
-            elif callback_text.startswith('complete_'):
-                lesson_hash = callback_text.replace('complete_', '')
+                success_text = f"✅ *Урок отмечен пройденным!*\n\n🎯 Получено: 10 баллов\n📚 Урок: {lesson}\n\n💫 Ваш прогресс растет!\n\n{text}"
                 
-                for course_name, course_info in COURSES.items():
-                    for lesson in course_info['уроки']:
-                        if hash(lesson) == int(lesson_hash):
-                            update_user_progress(chat_id, lesson)
-                            
-                            # Возвращаем в меню курса после завершения урока
-                            text, keyboard = get_course_menu(course_name)
-                            success_text = f"✅ *Урок отмечен пройденным!*\n\n🎯 Получено: 10 баллов\n📚 Урок: {lesson}\n\n💫 Ваш прогресс растет!\n\n{text}"
-                            
-                            edit_main_message(chat_id, success_text, keyboard, message_id)
-                            break
-                return jsonify({"status": "ok"})
-            
-            elif callback_text.startswith('open_lesson_'):
-                lesson_hash = callback_text.replace('open_lesson_', '')
-                
-                for course_name, course_info in COURSES.items():
-                    for lesson in course_info['уроки']:
-                        if hash(lesson) == int(lesson_hash):
-                            # Генерируем AI-урок
-                            ai_lesson = generate_ai_lesson(lesson, USER_PROGRESS.get(chat_id, {}).get('уровень', 1))
-                            
-                            # Создаем клавиатуру для урока
-                            lesson_keyboard = {
-                                "inline_keyboard": [
-                                    [{"text": "✅ Завершить урок", "callback_data": f"complete_{lesson_hash}"}],
-                                    [{"text": "🔙 Назад к курсу", "callback_data": f"menu_course_{course_name}"}]
-                                ]
-                            }
-                            
-                            lesson_text = f"📚 *{lesson}*\n\n{ai_lesson}"
-                            edit_main_message(chat_id, lesson_text, lesson_keyboard, message_id)
-                            break
-                return jsonify({"status": "ok"})
+                edit_main_message(user_id, success_text, keyboard, message_id)
+                break
 
-        # Обработка обычных сообщений - ТОЛЬКО ДЛЯ ПЕРВОГО ЗАПУСКА
-        message = data.get('message', {})
-        chat_id = message.get('chat', {}).get('id')
-        text = message.get('text', '')
+# Регистрация обработчиков
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CallbackQueryHandler(handle_callback))
 
-        if not chat_id:
-            return jsonify({"status": "error", "message": "No chat_id"})
+# Вебхук для Flask
+@app.route('/webhook', methods=['POST'])
+async def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('UTF-8')
+        update = Update.de_json(json_string, application.bot)
+        await application.process_update(update)
+        return jsonify(success=True)
+    return jsonify(success=False)
 
-        # Обработка команды /start - СОЗДАЕМ ПЕРВОЕ СООБЩЕНИЕ
-        if text == '/start':
-            menu_text, menu_keyboard = get_main_menu()
-            edit_main_message(chat_id, menu_text, menu_keyboard)
-            return jsonify({"status": "ok"})
+@app.route('/set_webhook', methods=['GET'])
+def set_webhook():
+    webhook_url = f"{WEBHOOK_URL}"
+    result = application.bot.set_webhook(url=WEBHOOK_URL)
+    return jsonify(success=result, webhook_url=WEBHOOK_URL)
 
-        return jsonify({"status": "ok"})        
-        
-    except Exception as e:
-        logging.error(f"Webhook error: {e}")
-        return jsonify({"status": "error", "message": str(e)})
-
-TON_API_KEY = "AEZIWI7NPO6LFRIAAAAFCRWL76ZY7YKGQS2HFKW66VUFXS4NR2M54PJL2NJBUYWDWFX4BEQ"
-
-@app.route('/ton-payment-webhook', methods=['POST'])
-def ton_payment_webhook():
-    """Вебхук для подтверждения платежей TON"""
-    try:
-        data = request.json
-        # Тестовая реализация - при первом платеже добавляем 10 TON
-        if UBI_SYSTEM["total_income"] == 0:
-            distribution = process_ubi_payment(10, "first_payment")
-            return jsonify({
-                "status": "success", 
-                "distribution": distribution,
-                "message": f"💰 Первый доход! UBI фонд пополнен на {distribution['ubi_fund']} TON"
-            })
-        return jsonify({"status": "success"})
-    except Exception as e:
-        return jsonify({"status": "error"})
-
-@app.route('/setup-ton-webhook', methods=['GET'])
-def setup_ton_webhook():
-    """Настройка вебхука в TON API"""
-    try:
-        webhook_url = f"https://{request.host}/ton-payment-webhook"
-        
-        response = requests.post(
-            "https://rt.tonapi.io/webhooks",
-            headers={"Authorization": f"Bearer {TON_API_KEY}"},
-            json={
-                "endpoint": webhook_url
-            }
-        )
-        
-        return jsonify({
-            "success": response.status_code == 200,
-            "webhook_url": webhook_url,
-            "response": response.json()
-        })
-        
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
-
-@app.route('/subscribe-wallet', methods=['GET'])
-def subscribe_wallet():
-    """Подписка вебхука на кошелек для отслеживания платежей"""
-    try:
-        response = requests.post(
-            "https://rt.tonapi.io/webhooks/15412/account-tx/subscribe",
-            headers={"Authorization": f"Bearer {TON_API_KEY}"},
-            json={
-                "accounts": [{
-                    "account_id": "UQAbs4Ak99raDhS8FUWLWNvKoUQ1LiHIxndfiIAj8p9BiusC"
-                }]
-            }
-        )
-        
-        return jsonify({
-            "success": response.status_code == 200,
-            "response": response.json()
-        })
-        
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+@app.route('/')
+def index():
+    return jsonify({
+        "status": "AI Education Platform is running!",
+        "timestamp": datetime.now().isoformat(),
+        "version": "cosmic_ai_1.0"
+    })
 
 @app.route('/test-ai', methods=['POST'])
 def test_ai():
@@ -513,26 +459,7 @@ def test_ai():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
-@app.route('/set-webhook', methods=['GET'])
-def set_webhook():
-    """Установка webhook для Telegram"""
-    webhook_url = f"https://{request.host}/webhook"
-    
-    try:
-        response = requests.get(
-            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook",
-            params={"url": webhook_url}
-        )
-        
-        return jsonify({
-            "success": response.status_code == 200,
-            "webhook_url": webhook_url,
-            "telegram_response": response.json()
-        })
-        
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
-
+# Запуск Flask
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port, debug=False)
