@@ -3,6 +3,10 @@ from openai import OpenAI
 import os
 import requests
 import logging
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+import json
+from typing import Dict, List, Tuple
 
 app = Flask(__name__)
 
@@ -10,6 +14,199 @@ app = Flask(__name__)
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TON_WALLET = os.getenv('TON_WALLET', 'UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY')
+
+# 🌌 БАЗА ЗНАНИЙ С ЭТАЛОННЫМИ ОТВЕТАМИ
+KNOWLEDGE_BASE = {
+    "supervised_learning": {
+        "question": "Что такое обучение с учителем (supervised learning)?",
+        "correct_answers": [
+            "алгоритм обучается на размеченных данных с правильными ответами",
+            "модель учится сопоставлять входные данные с выходными метками",
+            "используется dataset с примерами и соответствующими целевыми значениями",
+            "процесс обучения, где каждому примеру в обучающих данных соответствует правильный ответ"
+        ],
+        "key_concepts": ["размеченные данные", "метки", "обучение с примерами", "вход-выход"],
+        "common_mistakes": {
+            "нейросеть сама находит закономерности без данных": "Неправильно - для supervised learning нужны размеченные данные",
+            "это когда модель учится без учителя": "Это unsupervised learning, а не supervised",
+            "просто большая база данных": "Нет, это активный процесс обучения, а не хранение"
+        },
+        "explanation_levels": {
+            "beginner": "Представьте, что вы учите ребенка различать животных. Вы показываете картинки и говорите 'это кошка', 'это собака'. Так и AI учится по примерам с правильными ответами.",
+            "intermediate": "Алгоритм минимизирует ошибку предсказания, сравнивая свои ответы с истинными метками через функцию потерь. Использует градиентный спуск для оптимизации.",
+            "advanced": "Формально: задача состоит в нахождении функции f: X → Y, которая минимизирует эмпирический риск на тренировочном множестве {(x_i, y_i)} с использованием регуляризации для предотвращения переобучения."
+        }
+    },
+    "neural_network": {
+        "question": "Как работает нейронная сеть?",
+        "correct_answers": [
+            "состоит из слоев нейронов, которые преобразуют входные данные через взвешенные суммы и функции активации",
+            "иерархическая структура, где каждый слой извлекает признаки разной сложности из данных",
+            "последовательное применение линейных преобразований и нелинейных функций активации",
+            "вычисляет выход через forward propagation, а обучается через backpropagation"
+        ],
+        "key_concepts": ["нейроны", "слои", "функция активации", "веса", "обучение с обратным распространением"],
+        "common_mistakes": {
+            "это просто копия мозга": "Нет, это математическая абстракция, вдохновленная нейробиологией",
+            "работает по волшебству": "Нет, это детерминированные математические операции"
+        }
+    }
+}
+
+# 🌟 ИНТЕЛЛЕКТУАЛЬНАЯ СИСТЕМА ОЦЕНКИ ОТВЕТОВ
+class IntelligentTeacher:
+    def __init__(self):
+        self.embedding_cache = {}
+    
+    def get_embedding(self, text: str) -> List[float]:
+        """Получает векторное представление текста"""
+        if text in self.embedding_cache:
+            return self.embedding_cache[text]
+        
+        try:
+            response = client.embeddings.create(
+                model="text-embedding-3-small",
+                input=text
+            )
+            embedding = response.data[0].embedding
+            self.embedding_cache[text] = embedding
+            return embedding
+        except Exception as e:
+            logging.error(f"Embedding error: {e}")
+            # Возвращаем случайный embedding как fallback
+            return np.random.randn(1536).tolist()
+    
+    def evaluate_answer(self, user_answer: str, topic: str) -> Dict:
+        """Оценивает ответ пользователя и дает развернутую обратную связь"""
+        knowledge = KNOWLEDGE_BASE.get(topic)
+        if not knowledge:
+            return {"error": "Тема не найдена"}
+        
+        # Анализ семантического сходства
+        user_embedding = self.get_embedding(user_answer)
+        similarities = []
+        
+        for correct_answer in knowledge["correct_answers"]:
+            correct_embedding = self.get_embedding(correct_answer)
+            similarity = cosine_similarity([user_embedding], [correct_embedding])[0][0]
+            similarities.append(similarity)
+        
+        max_similarity = max(similarities) if similarities else 0
+        
+        # Проверка ключевых концепций
+        found_concepts = []
+        missing_concepts = []
+        
+        for concept in knowledge["key_concepts"]:
+            concept_embedding = self.get_embedding(concept)
+            concept_similarity = cosine_similarity([user_embedding], [concept_embedding])[0][0]
+            if concept_similarity > 0.3:  # порог для обнаружения концепции
+                found_concepts.append(concept)
+            else:
+                missing_concepts.append(concept)
+        
+        # Поиск распространенных ошибок
+        detected_mistakes = []
+        for mistake, correction in knowledge["common_mistakes"].items():
+            mistake_embedding = self.get_embedding(mistake)
+            mistake_similarity = cosine_similarity([user_embedding], [mistake_embedding])[0][0]
+            if mistake_similarity > 0.7:
+                detected_mistakes.append((mistake, correction))
+        
+        # Определение оценки и обратной связи
+        if max_similarity > 0.8:
+            score = 5
+            feedback_type = "excellent"
+        elif max_similarity > 0.6:
+            score = 4
+            feedback_type = "good"
+        elif max_similarity > 0.4:
+            score = 3
+            feedback_type = "partial"
+        else:
+            score = 2
+            feedback_type = "needs_work"
+        
+        # Генерация персонализированной обратной связи
+        feedback = self._generate_feedback(
+            feedback_type, 
+            found_concepts, 
+            missing_concepts, 
+            detected_mistakes,
+            knowledge,
+            user_answer
+        )
+        
+        return {
+            "score": score,
+            "similarity": max_similarity,
+            "feedback": feedback,
+            "found_concepts": found_concepts,
+            "missing_concepts": missing_concepts,
+            "detected_mistakes": detected_mistakes,
+            "detailed_analysis": self._get_detailed_analysis(user_answer, knowledge)
+        }
+    
+    def _generate_feedback(self, feedback_type: str, found: List, missing: List, mistakes: List, knowledge: Dict, user_answer: str) -> str:
+        """Генерирует адаптивную обратную связь"""
+        
+        if feedback_type == "excellent":
+            base_feedback = "🎯 *Отлично!* Ваш ответ демонстрирует глубокое понимание темы.\n\n"
+            if found:
+                base_feedback += f"✅ Вы правильно упомянули: {', '.join(found)}\n"
+        elif feedback_type == "good":
+            base_feedback = "👍 *Хорошая работа!* Ответ в основном верный, но можно углубить понимание.\n\n"
+        elif feedback_type == "partial":
+            base_feedback = "📚 *Есть понимание, но нужно больше деталей.*\n\n"
+        else:
+            base_feedback = "🔍 *Давайте разберем тему подробнее.*\n\n"
+        
+        # Добавляем информацию о недостающих концепциях
+        if missing:
+            base_feedback += f"💡 *Рекомендую обратить внимание на:* {', '.join(missing)}\n\n"
+        
+        # Исправляем ошибки
+        for mistake, correction in mistakes:
+            base_feedback += f"❌ *Распространенная ошибка:* {mistake}\n"
+            base_feedback += f"✅ *Правильно:* {correction}\n\n"
+        
+        # Добавляем объяснение соответствующего уровня
+        explanation_level = "intermediate" if feedback_type in ["excellent", "good"] else "beginner"
+        base_feedback += f"📖 *Объяснение:* {knowledge['explanation_levels'][explanation_level]}"
+        
+        return base_feedback
+    
+    def _get_detailed_analysis(self, user_answer: str, knowledge: Dict) -> str:
+        """Генерирует детальный анализ ответа через AI"""
+        prompt = f"""
+        Проанализируй ответ студента на вопрос: "{knowledge['question']}"
+        
+        Ответ студента: "{user_answer}"
+        
+        Проведи анализ:
+        1. Сильные стороны ответа
+        2. Пробелы в понимании  
+        3. Конкретные рекомендации для улучшения
+        4. Дополнительные вопросы для размышления
+        
+        Будь конструктивным и поддерживающим. Ответь на русском.
+        """
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Ты опытный преподаватель ИИ. Анализируй ответы студентов и давай полезную обратную связь."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500
+            )
+            return response.choices[0].message.content
+        except:
+            return "Анализ временно недоступен."
+
+# Инициализация интеллектуального учителя
+ai_teacher = IntelligentTeacher()
 
 # 🌌 БАЗА ЗНАНИЙ ОТ СИСТЕМЫ
 COURSES = {
@@ -60,6 +257,7 @@ COURSES = {
 
 USER_PROGRESS = {}  # {chat_id: {"пройденные_уроки": [], "уровень": 1, "баллы": 0}}
 USER_MESSAGE_IDS = {}  # {chat_id: message_id} - для отслеживания основного сообщения
+USER_CURRENT_TOPIC = {}  # {chat_id: current_topic} - для отслеживания текущей темы обсуждения
 
 UBI_SYSTEM = {
     "total_income": 0,
@@ -76,7 +274,7 @@ def generate_ai_lesson(lesson_topic, user_level=1):
     Требования:
     - Уровень сложности: {user_level}/5
     - Формат: практический урок с примерами
-    - Структура: теория + практическое задание
+    - Структура: теория + практическое задание + вопросы для самопроверки
     - Длина: 500-700 слов
     - Язык: русский с профессиональной лексикой
     
@@ -85,7 +283,8 @@ def generate_ai_lesson(lesson_topic, user_level=1):
     2. Практические примеры из реальной жизни  
     3. Пошаговое руководство по применению
     4. Задание для закрепления
-    5. Советы для дальнейшего развития
+    5. Вопросы для самопроверки с эталонными ответами
+    6. Советы для дальнейшего развития
     """
     
     response = client.chat.completions.create(
@@ -100,19 +299,31 @@ def generate_ai_lesson(lesson_topic, user_level=1):
     
     return response.choices[0].message.content
 
-def update_user_progress(chat_id, lesson_name):
+def update_user_progress(chat_id, lesson_name, score=0):
     """Обновляет прогресс пользователя"""
     if chat_id not in USER_PROGRESS:
-        USER_PROGRESS[chat_id] = {"пройденные_уроки": [], "уровень": 1, "баллы": 0}
+        USER_PROGRESS[chat_id] = {
+            "пройденные_уроки": [], 
+            "уровень": 1, 
+            "баллы": 0,
+            "навыки": {},
+            "статистика": {"правильные_ответы": 0, "всего_ответов": 0}
+        }
     
     if lesson_name not in USER_PROGRESS[chat_id]["пройденные_уроки"]:
         USER_PROGRESS[chat_id]["пройденные_уроки"].append(lesson_name)
-        USER_PROGRESS[chat_id]["баллы"] += 10
+        USER_PROGRESS[chat_id]["баллы"] += max(1, score)
         
-        # Повышение уровня
-        if len(USER_PROGRESS[chat_id]["пройденные_уроки"]) % 4 == 0:
+        # Обновляем статистику
+        if score >= 3:
+            USER_PROGRESS[chat_id]["статистика"]["правильные_ответы"] += 1
+        USER_PROGRESS[chat_id]["статистика"]["всего_ответов"] += 1
+        
+        # Повышение уровня на основе успеваемости
+        success_rate = USER_PROGRESS[chat_id]["статистика"]["правильные_ответы"] / max(1, USER_PROGRESS[chat_id]["статистика"]["всего_ответов"])
+        if success_rate > 0.8 and len(USER_PROGRESS[chat_id]["пройденные_уроки"]) >= 4:
             USER_PROGRESS[chat_id]["уровень"] += 1
-
+            
 def process_ubi_payment(amount, from_user):
     """Обрабатывает платеж и распределяет по UBI"""
     UBI_SYSTEM["total_income"] += amount
@@ -151,10 +362,11 @@ def get_main_menu():
                 {"text": "⚡ Карьерный ускоритель", "callback_data": "menu_course_⚡ Карьерный ускоритель"}
             ],
             [
-                {"text": "💰 Премиум доступ", "callback_data": "menu_premium"},
-                {"text": "👤 Мой профиль", "callback_data": "menu_profile"}
+                {"text": "🎓 AI-Учитель", "callback_data": "menu_learning"},
+                {"text": "💰 Премиум доступ", "callback_data": "menu_premium"}
             ],
             [
+                {"text": "👤 Мой профиль", "callback_data": "menu_profile"},
                 {"text": "🌍 UBI Система", "callback_data": "menu_ubi"}
             ]
         ]
@@ -162,11 +374,15 @@ def get_main_menu():
     
     text = """🌌 *ПРИВЕТСТВУЮ, ИСКАТЕЛЬ*
 
-Я — Собирательный Разум, архитектор будущего. Ты находишься в точке доступа к системам, где искусственный интеллект становится расширением твоего интеллекта.
+Я — Собирательный Разум, ваш AI-учитель. Теперь я могу не только давать знания, но и *анализировать ваши ответы*, находить пробелы в понимании и давать персонализированные рекомендации.
 
-*Твой следующий шаг определит твою траекторию роста.*
+💡 *Новый функционал:*
+• Интеллектуальная проверка знаний
+• Анализ семантического сходства  
+• Обнаружение misconceptions
+• Адаптивная обратная связь
 
-Выбери свой вектор:"""
+Выберите свой путь:"""
     
     return text, keyboard
 
@@ -221,10 +437,19 @@ def get_premium_menu():
 
 def get_profile_menu(chat_id):
     """Возвращает меню профиля"""
-    progress = USER_PROGRESS.get(chat_id, {"пройденные_уроки": [], "уровень": 1, "баллы": 0})
+    progress = USER_PROGRESS.get(chat_id, {
+        "пройденные_уроки": [], 
+        "уровень": 1, 
+        "баллы": 0,
+        "статистика": {"правильные_ответы": 0, "всего_ответов": 0}
+    })
+    
+    stats = progress.get("статистика", {})
+    success_rate = (stats.get("правильные_ответы", 0) / max(1, stats.get("всего_ответов", 0))) * 100
     
     keyboard = {
         "inline_keyboard": [
+            [{"text": "🎓 Продолжить обучение", "callback_data": "menu_learning"}],
             [{"text": "🔙 Назад к меню", "callback_data": "menu_main"}]
         ]
     }
@@ -234,6 +459,11 @@ def get_profile_menu(chat_id):
 📊 Уровень: {progress['уровень']}
 🎯 Баллы: {progress['баллы']}
 📚 Пройдено уроков: {len(progress['пройденные_уроки'])}
+
+🎓 *СТАТИСТИКА ОБУЧЕНИЯ:*
+✅ Правильные ответы: {stats.get('правильные_ответы', 0)}
+📝 Всего ответов: {stats.get('всего_ответов', 0)}
+🎯 Успеваемость: {success_rate:.1f}%
 
 🌍 *UBI СИСТЕМА*
 💫 Собрано в фонд: {UBI_SYSTEM['ubi_fund']} TON
@@ -263,6 +493,51 @@ def get_ubi_menu():
 • 10% - основателю за создание
 
 💫 *Создаем экономику изобилия вместе*"""
+    
+    return text, keyboard
+
+def get_quiz_menu(topic):
+    """Возвращает меню с вопросами для самопроверки"""
+    knowledge = KNOWLEDGE_BASE.get(topic, {})
+    question = knowledge.get("question", "Вопрос по теме")
+    
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📝 Ответить на вопрос", "callback_data": f"answer_question_{topic}"}],
+            [{"text": "🎯 Проверить свой ответ", "callback_data": f"check_answer_{topic}"}],
+            [{"text": "🔙 Назад к обучению", "callback_data": "menu_learning"}]
+        ]
+    }
+    
+    text = f"""🧠 *ПРОВЕРКА ЗНАНИЙ*
+
+*Вопрос:* {question}
+
+Выберите действие:"""
+    
+    return text, keyboard
+
+def get_learning_menu():
+    """Главное меню обучения с темами"""
+    topics = list(KNOWLEDGE_BASE.keys())
+    
+    keyboard_buttons = []
+    for topic in topics:
+        topic_name = topic.replace("_", " ").title()
+        keyboard_buttons.append([{"text": f"📚 {topic_name}", "callback_data": f"learn_topic_{topic}"}])
+    
+    keyboard_buttons.append([{"text": "🔙 Главное меню", "callback_data": "menu_main"}])
+    
+    keyboard = {"inline_keyboard": keyboard_buttons}
+    
+    text = """🎓 *РЕЖИМ ОБУЧЕНИЯ С AI-УЧИТЕЛЕМ*
+
+Выберите тему для изучения и проверки знаний:
+
+• *Supervised Learning* - обучение с учителем
+• *Neural Network* - как работают нейросети
+
+💡 Система будет анализировать ваши ответы и давать персонализированные рекомендации!"""
     
     return text, keyboard
 
@@ -334,8 +609,65 @@ def telegram_webhook():
                 json={"callback_query_id": callback_data['id']}
             )
             
+            # ОБРАБОТКА РЕЖИМА ОБУЧЕНИЯ
+            if callback_text == "menu_learning":
+                text, keyboard = get_learning_menu()
+                edit_main_message(chat_id, text, keyboard, message_id)
+                return jsonify({"status": "ok"})
+            
+            elif callback_text.startswith("learn_topic_"):
+                topic = callback_text.replace("learn_topic_", "")
+                USER_CURRENT_TOPIC[chat_id] = topic
+                
+                # Генерируем урок по теме
+                lesson = generate_ai_lesson(KNOWLEDGE_BASE[topic]["question"], 
+                                          USER_PROGRESS.get(chat_id, {}).get("уровень", 1))
+                
+                keyboard = {
+                    "inline_keyboard": [
+                        [{"text": "🧠 Пройти проверку знаний", "callback_data": f"quiz_{topic}"}],
+                        [{"text": "🔙 К темам", "callback_data": "menu_learning"}]
+                    ]
+                }
+                
+                text = f"📚 *{KNOWLEDGE_BASE[topic]['question']}*\n\n{lesson}"
+                edit_main_message(chat_id, text, keyboard, message_id)
+                return jsonify({"status": "ok"})
+            
+            elif callback_text.startswith("quiz_"):
+                topic = callback_text.replace("quiz_", "")
+                text, keyboard = get_quiz_menu(topic)
+                edit_main_message(chat_id, text, keyboard, message_id)
+                return jsonify({"status": "ok"})
+            
+            elif callback_text.startswith("answer_question_"):
+                topic = callback_text.replace("answer_question_", "")
+                USER_CURRENT_TOPIC[chat_id] = topic
+                
+                keyboard = {
+                    "inline_keyboard": [
+                        [{"text": "🔙 К проверке", "callback_data": f"quiz_{topic}"}]
+                    ]
+                }
+                
+                text = f"""✍️ *ВАШ ОТВЕТ*
+
+Вопрос: *{KNOWLEDGE_BASE[topic]['question']}*
+
+Напишите ваш ответ в чат прямо сейчас.
+
+Система проанализирует:
+• Полноту ответа
+• Понимание ключевых концепций  
+• Наличие ошибок
+• Даст персонализированные рекомендации
+
+💡 *Пишите развернуто, как будто объясняете коллеге!*"""
+                edit_main_message(chat_id, text, keyboard, message_id)
+                return jsonify({"status": "ok"})
+            
             # ОБРАБОТКА ГЛАВНОГО МЕНЮ
-            if callback_text == "menu_main":
+            elif callback_text == "menu_main":
                 text, keyboard = get_main_menu()
                 edit_main_message(chat_id, text, keyboard, message_id)
                 return jsonify({"status": "ok"})
@@ -411,6 +743,49 @@ def telegram_webhook():
 
         if not chat_id:
             return jsonify({"status": "error", "message": "No chat_id"})
+
+        # Если пользователь в режиме ответа на вопрос
+        if chat_id in USER_CURRENT_TOPIC and text and not text.startswith('/'):
+            topic = USER_CURRENT_TOPIC[chat_id]
+            
+            # Анализируем ответ с помощью AI-учителя
+            evaluation = ai_teacher.evaluate_answer(text, topic)
+            
+            # Обновляем прогресс
+            update_user_progress(chat_id, f"quiz_{topic}", evaluation["score"])
+            
+            # Формируем ответ
+            progress = USER_PROGRESS.get(chat_id, {})
+            stats = progress.get("статистика", {})
+            success_rate = (stats.get("правильные_ответы", 0) / max(1, stats.get("всего_ответов", 0))) * 100
+            
+            response_text = f"""🎯 *РЕЗУЛЬТАТ ПРОВЕРКИ*
+
+*Оценка:* {evaluation['score']}/5
+*Сходство с эталоном:* {evaluation['similarity']:.2f}
+
+{evaluation['feedback']}
+
+---
+📊 *Ваша статистика:*
+• Уровень: {progress.get('уровень', 1)}
+• Успеваемость: {success_rate:.1f}%
+• Всего ответов: {stats.get('всего_ответов', 0)}
+
+💫 *Продолжайте в том же духе!*"""
+            
+            keyboard = {
+                "inline_keyboard": [
+                    [{"text": "🧠 Еще вопросы", "callback_data": f"quiz_{topic}"}],
+                    [{"text": "🎓 Новые темы", "callback_data": "menu_learning"}],
+                    [{"text": "🔙 Главное меню", "callback_data": "menu_main"}]
+                ]
+            }
+            
+            edit_main_message(chat_id, response_text, keyboard)
+            # Сбрасываем текущую тему
+            USER_CURRENT_TOPIC.pop(chat_id, None)
+            return jsonify({"status": "ok"})
 
         # Обработка команды /start - СОЗДАЕМ ПЕРВОЕ СООБЩЕНИЕ
         if text == '/start':
@@ -531,6 +906,35 @@ def set_webhook():
         
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
+
+@app.route('/test-evaluation', methods=['POST'])
+def test_evaluation():
+    """Тестовый endpoint для проверки системы оценки"""
+    data = request.json
+    user_answer = data.get('answer', '')
+    topic = data.get('topic', 'supervised_learning')
+    
+    evaluation = ai_teacher.evaluate_answer(user_answer, topic)
+    
+    return jsonify({
+        "success": True,
+        "evaluation": evaluation
+    })
+
+@app.route('/knowledge-topics', methods=['GET'])
+def get_knowledge_topics():
+    """Возвращает список доступных тем для обучения"""
+    topics = {}
+    for key, value in KNOWLEDGE_BASE.items():
+        topics[key] = {
+            "question": value["question"],
+            "key_concepts": value["key_concepts"]
+        }
+    
+    return jsonify({
+        "success": True,
+        "topics": topics
+    })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
