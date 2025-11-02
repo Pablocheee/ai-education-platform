@@ -803,14 +803,14 @@ def telegram_webhook():
             if chat_id in USER_MESSAGE_IDS:
                 edit_telegram_message(chat_id, USER_MESSAGE_IDS[chat_id], lesson_text, lesson_keyboard)
 
-        return jsonify({"status": "ok"})        
-
             # 🎯 ОБРАБОТКА МИКРО-ОБУЧЕНИЯ
             if callback_text.startswith("start_micro:"):
                 lesson_id = callback_text.replace("start_micro:", "")
                 text, keyboard = create_micro_lesson_message(chat_id, lesson_id, 0)
                 edit_main_message(chat_id, text, keyboard, message_id)
                 return jsonify({"status": "ok"})
+
+        return jsonify({"status": "ok"})
             
             elif callback_text.startswith("lesson_nav:"):
                 _, lesson_id, module_index = callback_text.split(":")
