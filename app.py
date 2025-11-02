@@ -3,16 +3,10 @@ from openai import OpenAI
 import os
 import requests
 import logging
-<<<<<<< HEAD
 import json
 from datetime import datetime
-=======
-from sklearn.metrics.pairwise import cosine_similarity
-import json
-from typing import Dict, List, Tuple
 import time
->>>>>>> 7d3b03c03b74fce5cfb3e9078c442f71c0c957f5
-
+from typing import Dict, List, Tuple
 app = Flask(__name__)
 
 # Настройка API ключей
