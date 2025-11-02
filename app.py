@@ -784,7 +784,7 @@ def get_learning_progress(chat_id: int):
     
     return text, keyboard
 
-# 🔧 ОБНОВЛЯЕМ WEBHOOK ДЛЯ МИКРО-ОБУЧЕНИЯ
+# 🔧 ОБНОВЛЯЕМ WEBHOOK ДЛЯ МИКРО-ОБУЧЕНИ
 @app.route('/webhook', methods=['POST'])
 def telegram_webhook():
     """Webhook для Telegram бота"""
