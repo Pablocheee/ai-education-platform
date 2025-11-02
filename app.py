@@ -7,7 +7,6 @@ import logging
 import json
 from datetime import datetime
 =======
-import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import json
 from typing import Dict, List, Tuple
