@@ -645,7 +645,7 @@ def telegram_webhook():
                 edit_main_message(chat_id, menu_data['text'], menu_data['keyboard'], message_id)
                 return jsonify({"status": "ok"})
             
-            # ОБРАБОТКА КУРСОВ
+            # ОБРАБОТКА КУРСОВ 
             elif callback_text.startswith("menu_course_"):
                 course_name = callback_text.replace("menu_course_", "")
                 menu_data = menu_manager.get_enhanced_course_menu(course_name, chat_id)
