@@ -738,6 +738,15 @@ def ton_payment_webhook():
     except Exception as e:
         return jsonify({"status": "error"})
 
+@app.route('/set-webhook')
+def set_webhook_route():
+    webhook_url = f"https://ai-education-platform-mh01.onrender.com/webhook"
+    response = requests.get(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook",
+        params={"url": webhook_url}
+    )
+    return jsonify(response.json())
+
 @app.route('/setup-ton-webhook', methods=['GET'])
 def setup_ton_webhook():
     """Настройка вебхука в TON API"""
