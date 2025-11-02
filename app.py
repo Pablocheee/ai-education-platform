@@ -1,5 +1,8 @@
+from dotenv import load_dotenv
+load_dotenv()
 from flask import Flask, request, jsonify
 from openai import OpenAI
+import httpx
 import os
 import requests
 import logging
@@ -90,10 +93,7 @@ def generate_ai_lesson(lesson_topic, user_level=1):
     
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Ты эксперт-преподаватель с 20-летним опытом. Создавай практические, полезные уроки которые сразу можно применять в работе."},
-            {"role": "user", "content": prompt}
-        ],
+        messages=[...],
         max_tokens=1500,
         temperature=0.7
     )
