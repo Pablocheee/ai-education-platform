@@ -343,7 +343,7 @@ class MenuManager:
         # Обновляем шаг
         update_lesson_state(chat_id, lesson_topic, current_step + 1)
         
-        # ПРОСТАЯ КЛАВИАТУРА - ТОЛЬКО НАЗАДд
+        # ПРОСТАЯ КЛАВИАТУРА - ТОЛЬКО НАЗАД
         keyboard = {
             "inline_keyboard": [
                 [{"text": "🔙 Назад к курсу", "callback_data": "menu_course_back"}]
