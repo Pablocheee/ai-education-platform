@@ -1,14 +1,16 @@
-import httpx
+﻿import httpx
 from flask import Flask, request, jsonify
-from openai import OpenAI
+import google.generativeai as genai
 import os
 import requests
 import logging
 
 app = Flask(__name__)
 
-# Настройка API ключей
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'), http_client=httpx.Client())
+# Настройка API ключей для Gemini
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+genai.configure(api_key=GEMINI_API_KEY)
+
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TON_WALLET = os.getenv('TON_WALLET', 'UQAVTMHfwYcMn7ttJNXiJVaoA-jjRTeJHc2sjpkAVzc84oSY')
 
@@ -69,7 +71,7 @@ def process_development_fund(amount, from_user):
     
     return distribution
 
-# 🎯 УЛУЧШЕННЫЙ ДИАЛОГОВЫЙ AI-ПРЕПОДАВАТЕЛЬ
+# 🎯 УЛУЧШЕННЫЙ ДИАЛОГОВЫЙ AI-ПРЕПОДАВАТЕЛЬ (GEMINI)
 class DialogAITeacher:
     def __init__(self):
         self.teacher_styles = {
@@ -78,9 +80,11 @@ class DialogAITeacher:
             "практика": "🔧",
             "обратная связь": "💫"
         }
+        # Настройка модели Gemini
+        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
     def generate_lesson_step(self, lesson_topic, user_level, conversation_history, current_step):
-        """Генерирует следующий шаг урока"""
+        """Генерирует следующий шаг урока используя Gemini"""
         
         system_prompt = f"""
         Ты - опытный AI-преподаватель NeuroTeacher. Веди естественный диалог с учеником.
@@ -97,21 +101,24 @@ class DialogAITeacher:
         3. Задавай открытые вопросы
         4. Будь немного креативным в подаче
         5. Не будь слишком формальным
+        6. Отвечай на русском языке
+        7. Будь кратким, но информативным (максимум 3-4 предложения)
         
-        Продолжи урок:
+        Продолжи урок естественным образом:
         """
         
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": "Продолжи урок естественным образом:"}
-            ],
-            max_tokens=500,
-            temperature=0.8
-        )
-        
-        return response.choices[0].message.content
+        try:
+            response = self.model.generate_content(
+                system_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=500,
+                    temperature=0.8
+                )
+            )
+            return response.text
+        except Exception as e:
+            logging.error(f"Gemini API error: {e}")
+            return "🧠 Давайте продолжим наш урок! Расскажите, что вам было наиболее интересно в предыдущей части?"
 
     def _format_conversation_history(self, history):
         if not history:
@@ -322,7 +329,7 @@ class MenuManager:
         conversation_history = lesson_state.get("conversation", [])
         current_step = lesson_state.get("step", 0)
         
-        # Генерируем следующий шаг урока
+        # Генерируем следующий шаг урока через Gemini
         teacher_response = dialog_teacher.generate_lesson_step(
             lesson_topic, 
             user_level, 
@@ -401,12 +408,13 @@ def home():
         "status": "NeuroTeacher - Dialog Education Platform",
         "version": "4.4", 
         "ready": True,
+        "ai_provider": "Gemini Flash 2.0",
         "founder_wallet": TON_WALLET
     })
 
 @app.route('/health')
 def health():
-    return jsonify({"status": "healthy", "service": "NeuroTeacher"})
+    return jsonify({"status": "healthy", "service": "NeuroTeacher", "ai": "Gemini Flash 2.0"})
 
 @app.route('/webhook', methods=['POST'])
 def telegram_webhook():
@@ -551,8 +559,6 @@ def telegram_webhook():
     except Exception as e:
         logging.error(f"Webhook error: {e}")
         return jsonify({"status": "error", "message": str(e)})
-
-# ... остальной код
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
