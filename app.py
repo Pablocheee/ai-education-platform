@@ -536,12 +536,35 @@ def telegram_webhook():
         if lesson_state and "current_lesson" in lesson_state:
             current_lesson = lesson_state["current_lesson"]
             
-            # ОБНОВЛЯЕМ СОСТОЯНИЕ БЕЗ ОТПРАВКИ ОТДЕЛЬНОГО СООБЩЕНИЯ
+            # ОБНОВЛЯЕМ СОСТОЯНИЕ
             update_lesson_state(chat_id, current_lesson, lesson_state["step"], text)
             
-            # ПОЛУЧАЕМ ОТВЕТ УЧИТЕЛЯ
+            # СНАЧАЛА ОТПРАВЛЯЕМ СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЯ
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": f"👤 *Вы:* {text}",
+                    "parse_mode": "Markdown"
+                }
+            )
+            
+            # ЗАТЕМ ОТПРАВЛЯЕМ ОТВЕТ УЧИТЕЛЯ
             menu_data = menu_manager.get_dialog_lesson(chat_id, current_lesson, text)
-            edit_main_message(chat_id, menu_data['text'], menu_data['keyboard'], USER_MESSAGE_IDS.get(chat_id))
+            response = requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": menu_data['text'],
+                    "reply_markup": menu_data['keyboard'],
+                    "parse_mode": "Markdown"
+                }
+            )
+            
+            # Сохраняем ID последнего сообщения учителя
+            if response.status_code == 200:
+                result = response.json()
+                USER_MESSAGE_IDS[chat_id] = result['result']['message_id']
             
             return jsonify({"status": "ok"})
 
