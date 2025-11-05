@@ -1,0 +1,3 @@
+git add .
+git commit -m "Simplify dialog interface - remove extra buttons"
+git push origin main
